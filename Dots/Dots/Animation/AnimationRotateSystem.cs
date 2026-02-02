@@ -21,7 +21,7 @@ namespace Dots
     [UpdateInGroup(typeof(AnimationSystemGroup))]
     public partial struct AnimationRotateSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
@@ -33,7 +33,7 @@ namespace Dots
         {
             state.RequireForUpdate<GlobalInitialized>();
 
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
@@ -55,7 +55,7 @@ namespace Dots
                 return;
             }
             
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
@@ -76,9 +76,9 @@ namespace Dots
                 localTransform.ValueRW.Rotation = newRot;
                 localTransform.ValueRW.Position = newPos;
                 
-                if (tag.UseAtkRange && _creatureLookup.HasComponent(tag.MasterCreature))
+                if (tag.UseAtkRange && _summonLookup.HasComponent(tag.MasterCreature))
                 {
-                    var factor = AttrHelper.GetDamageRangeFactor(tag.MasterCreature, _creatureLookup, _attrLookup, _attrModifyLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, true);
+                    var factor = AttrHelper.GetDamageRangeFactor(tag.MasterCreature, _summonLookup, _attrLookup, _attrModifyLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, true);
                     localTransform.ValueRW.Scale = BuffHelper.CalcFactor(tag.SourceScale, factor);
                 }
             }

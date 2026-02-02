@@ -29,13 +29,14 @@ namespace Dots
         {
             _localToWorldLookup.Update(ref state);
 
-            var playerAspect = SystemAPI.GetAspect<PlayerAspect>(SystemAPI.GetSingletonEntity<LocalPlayerTag>());
             var global = SystemAPI.GetAspect<GlobalAspect>(SystemAPI.GetSingletonEntity<GlobalInitialized>());
-
+           
 
             if (!global.CameraInited)
             {
-                var lookAtPos = playerAspect.Position;
+                var localPlayer = SystemAPI.GetSingletonEntity<LocalPlayerTag>();
+                var localPlayerTrans = SystemAPI.GetComponent<LocalToWorld>(localPlayer);
+                var lookAtPos = localPlayerTrans.Position;
                 lookAtPos.z = global.PlayerBornPos.z;
                 UpdateCamera(lookAtPos, SystemAPI.Time.DeltaTime);
 

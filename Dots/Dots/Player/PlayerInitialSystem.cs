@@ -25,7 +25,8 @@ namespace Dots
             var global = SystemAPI.GetAspect<GlobalAspect>(SystemAPI.GetSingletonEntity<GlobalInitialized>());
             var ecb = new EntityCommandBuffer(Allocator.Temp);
 
-            foreach (var (initData, creature, transform, entity) in SystemAPI.Query<PlayerInitTag, CreatureProperties, LocalTransform>().WithEntityAccess())
+            foreach (var (initData, creature, transform, entity) 
+                     in SystemAPI.Query<PlayerInitTag, CreatureProps, LocalTransform>().WithEntityAccess())
             {
                 ecb.RemoveComponent<PlayerInitTag>(entity);
 

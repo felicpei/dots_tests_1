@@ -12,11 +12,11 @@ namespace Dots
     [UpdateInGroup(typeof(PlayerSystemGroup))]
     public partial struct HpRecoverySystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<DisableHurtTag> _disableHurtLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
@@ -26,9 +26,9 @@ namespace Dots
         {
             state.RequireForUpdate<GlobalInitialized>();
 
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _disableHurtLookup = state.GetComponentLookup<DisableHurtTag>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
@@ -54,7 +54,7 @@ namespace Dots
             _disableHurtLookup.Update(ref state);
             _attrLookup.Update(ref state);
             _attrModifyLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
@@ -69,7 +69,7 @@ namespace Dots
                 DeltaTime = deltaTime,
                 DeadLookup = _deadLookup,
                 DisableHurtLookup = _disableHurtLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
                 AttrLookup = _attrLookup,
                 AttrModifyLookup = _attrModifyLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
@@ -88,11 +88,11 @@ namespace Dots
             public float DeltaTime;
             public Entity CacheEntity;
             public EntityCommandBuffer.ParallelWriter Ecb;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<DisableHurtTag> DisableHurtLookup;
             [ReadOnly] public ComponentLookup<PlayerAttrData> AttrLookup;
             [ReadOnly] public BufferLookup<PlayerAttrModify> AttrModifyLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
@@ -111,7 +111,7 @@ namespace Dots
                     return;
                 }
 
-                var attrRecovery = AttrHelper.GetAttr(entity, EAttr.Recovery, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                var attrRecovery = AttrHelper.GetAttr(entity, EAttr.Recovery, AttrLookup, AttrModifyLookup, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                 if (attrRecovery > 0)
                 {
                     var interval = AttrHelper.GetHpRecoveryInterval(attrRecovery);

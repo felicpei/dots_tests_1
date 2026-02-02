@@ -16,9 +16,9 @@ namespace Dots
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _localToWorldLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private ComponentLookup<DisableBulletHitTag> _disableBulletHitLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
@@ -30,21 +30,21 @@ namespace Dots
         [ReadOnly] private ComponentLookup<BulletRepel> _bulletRepelLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
-        
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<GlobalInitialized>();
             state.RequireForUpdate<PhysicsWorldSingleton>();
             state.RequireForUpdate<CacheProperties>();
-            
+
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _bombLookup = state.GetComponentLookup<BulletBombTag>(true);
             _destroyLookup = state.GetComponentLookup<BulletDestroyTag>(true);
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _localToWorldLookup = state.GetComponentLookup<LocalToWorld>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _disableBulletHitLookup = state.GetComponentLookup<DisableBulletHitTag>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
@@ -77,7 +77,7 @@ namespace Dots
             _creatureTag.Update(ref state);
             _deadLookup.Update(ref state);
             _localToWorldLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _disableBulletHitLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
@@ -88,11 +88,11 @@ namespace Dots
             _bulletRepelLookup.Update(ref state);
             _attrLookup.Update(ref state);
             _attrModifyLookup.Update(ref state);
-            
+
             var collisionWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>().CollisionWorld;
             var cacheEntity = SystemAPI.GetSingletonEntity<CacheProperties>();
             var ecb = new EntityCommandBuffer(Allocator.TempJob);
-            
+
             //爆炸
             new BulletBombJob
             {
@@ -104,7 +104,7 @@ namespace Dots
                 CreatureTag = _creatureTag,
                 DeadLookup = _deadLookup,
                 TransformLookup = _localToWorldLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
                 CollisionWorld = collisionWorld,
                 DisableBulletHitLookup = _disableBulletHitLookup,
                 BuffAppendBuffToBullet = _buffAppendBuffToBullet,
@@ -133,9 +133,9 @@ namespace Dots
 
             [ReadOnly] public BufferLookup<SkillEntities> SkillEntitiesLookup;
             [ReadOnly] public ComponentLookup<CreatureTag> CreatureTag;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<LocalToWorld> TransformLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
             [ReadOnly] public ComponentLookup<DisableBulletHitTag> DisableBulletHitLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
@@ -148,7 +148,7 @@ namespace Dots
             [ReadOnly] public ComponentLookup<BulletRepel> BulletRepelLookup;
             [ReadOnly] public ComponentLookup<PlayerAttrData> AttrLookup;
             [ReadOnly] public BufferLookup<PlayerAttrModify> AttrModifyLookup;
-            
+
             [BurstCompile]
             private void Execute(RefRW<BulletBombTag> tag, BulletProperties properties, BulletAtkValue atkValue, DynamicBuffer<BulletHitCreature> hitCreatures,
                 RefRW<RandomSeed> random, Entity entity, [EntityIndexInQuery] int sortKey)
@@ -181,7 +181,7 @@ namespace Dots
                 {
                     var hitEntities = PhysicsHelper.OverlapEnemies(properties.MasterCreature, CollisionWorld,
                         localTransform.Position, properties.BombRadius, CreatureTag, DeadLookup, properties.Team, config.HitSameTeam);
-                    
+
                     for (var i = 0; i < hitEntities.Length; i++)
                     {
                         var hitEntity = hitEntities[i];
@@ -197,10 +197,10 @@ namespace Dots
                         {
                             continue;
                         }
-                        
-                        BulletHelper.HitCreature(properties, entity, BulletRepelLookup, GlobalEntity, CacheEntity, CacheLookup, 
+
+                        BulletHelper.HitCreature(properties, entity, BulletRepelLookup, GlobalEntity, CacheEntity, CacheLookup,
                             random, hitCreatures, Ecb, sortKey, hitEntity, true,
-                            SkillEntitiesLookup, SkillTagLookup, BuffEntitiesLookup, BuffTagLookup, CreatureLookup, BuffCommonLookup, BuffAppendBuffToBullet, AttrLookup, AttrModifyLookup);
+                            SkillEntitiesLookup, SkillTagLookup, BuffEntitiesLookup, BuffTagLookup, SummonLookup, BuffCommonLookup, BuffAppendBuffToBullet, AttrLookup, AttrModifyLookup);
                     }
 
                     hitEntities.Dispose();
@@ -238,7 +238,7 @@ namespace Dots
 
                 if (properties.AllowSkillEndAction && SkillTagLookup.TryGetComponent(properties.SkillEntity, out var _))
                 {
-                    var atk = new AtkValue(atkValue.Atk, atkValue.Crit, atkValue.CritDamage, properties.Team); 
+                    var atk = new AtkValue(atkValue.Atk, atkValue.Crit, atkValue.CritDamage, properties.Team);
                     Ecb.AppendToBuffer(sortKey, properties.SkillEntity, new SkillEndBuffer(properties.ShootPos, localTransform.Position, Entity.Null, atk, properties.SkillEndActionIndex));
                     Ecb.SetComponentEnabled<SkillEndBuffer>(sortKey, properties.SkillEntity, true);
                 }

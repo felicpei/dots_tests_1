@@ -20,7 +20,7 @@ namespace Dots
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _transformLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusCenter> _centerLookup;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -35,7 +35,7 @@ namespace Dots
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _cacheLookup = state.GetComponentLookup<CacheProperties>(true);
             _transformLookup = state.GetComponentLookup<LocalToWorld>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _centerLookup = state.GetComponentLookup<StatusCenter>(true);
         }
 
         [BurstCompile]
@@ -58,7 +58,7 @@ namespace Dots
             _buffTagLookup.Update(ref state);
             _cacheLookup.Update(ref state);
             _transformLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _centerLookup.Update(ref state);
 
             var ecb = new EntityCommandBuffer(Allocator.TempJob);
             var collisionWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>().CollisionWorld;
@@ -78,7 +78,7 @@ namespace Dots
                 CacheEntity = cacheEntity,
                 CacheLookup = _cacheLookup,
                 TransformLookup = _transformLookup,
-                CreatureLookup = _creatureLookup,
+                CenterLookup = _centerLookup,
                 World = collisionWorld,
             }.ScheduleParallel();
             state.Dependency.Complete();
@@ -104,7 +104,7 @@ namespace Dots
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<LocalToWorld> TransformLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusCenter> CenterLookup;
 
             [BurstCompile]
             private void Execute(DynamicBuffer<BulletBehaviourBuffer> buffers, LocalTransform localTransform, DynamicBuffer<BulletTriggerBuffer> triggerBuffers, RefRW<BulletProperties> properties, RefRW<RandomSeed> random,
@@ -312,9 +312,9 @@ namespace Dots
                                 var minDist = info.TriggerParam1;
                                 if (minDist < 0.3f) minDist = 0.3f;
                                 if (TransformLookup.TryGetComponent(properties.ValueRO.HeadingToTarget, out var targetTransform) &&
-                                    CreatureLookup.TryGetComponent(properties.ValueRO.HeadingToTarget, out var targetCreature))
+                                    CenterLookup.TryGetComponent(properties.ValueRO.HeadingToTarget, out var targetCenter))
                                 {
-                                    var tar = properties.ValueRO.HeadingOffset + CreatureHelper.getCenterPos(targetTransform.Position, targetCreature, targetTransform.Value.Scale().x);
+                                    var tar = properties.ValueRO.HeadingOffset + CreatureHelper.GetCenterPos(targetTransform.Position, targetCenter, targetTransform.Value.Scale().x);
                                     if (math.distance(localTransform.Position, tar) < minDist)
                                     {
                                         Ecb.SetComponentEnabled<BulletActionBuffer>(sortKey, entity, true);

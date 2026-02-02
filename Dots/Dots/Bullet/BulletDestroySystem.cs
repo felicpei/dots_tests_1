@@ -9,14 +9,12 @@ namespace Dots
     [UpdateInGroup(typeof(LateSystemGroup))]
     public partial struct BulletDestroySystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
         [ReadOnly] private BufferLookup<BindingBullet> _bindBulletLookup;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<GlobalInitialized>();
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
             _bindBulletLookup = state.GetBufferLookup<BindingBullet>();
         }
 
@@ -31,7 +29,6 @@ namespace Dots
             var ecb = new EntityCommandBuffer(Allocator.Temp);
             var global = SystemAPI.GetAspect<GlobalAspect>(SystemAPI.GetSingletonEntity<GlobalInitialized>());
 
-            _creatureLookup.Update(ref state);
             _bindBulletLookup.Update(ref state);
 
             foreach (var (tag, properties, entity) in SystemAPI.Query<RefRW<BulletDestroyTag>, BulletProperties>().WithEntityAccess())

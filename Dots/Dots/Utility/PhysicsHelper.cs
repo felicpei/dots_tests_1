@@ -53,7 +53,7 @@ namespace Dots
         }
 
 
-        public static bool GetNearestEnemy(Entity attacker, CollisionWorld world, float3 pos, float radius, ComponentLookup<CreatureTag> creatureLookup, ComponentLookup<InDeadTag> deadLookup, ComponentLookup<DisableAutoTargetTag> disableAutoTarget,
+        public static bool GetNearestEnemy(Entity attacker, CollisionWorld world, float3 pos, float radius, ComponentLookup<CreatureTag> creatureLookup, ComponentLookup<InDeadState> deadLookup, ComponentLookup<DisableAutoTargetTag> disableAutoTarget,
             ETeamId teamId, out Entity result, EHitRule hitRule = EHitRule.Enemy)
         {
             result = Entity.Null;
@@ -106,7 +106,7 @@ namespace Dots
             return bFind;
         }
 
-        public static bool GetFarEnemy(Entity attacker, CollisionWorld world, float3 pos, float radius, ComponentLookup<CreatureTag> creatureLookup, ComponentLookup<InDeadTag> deadLookup, ComponentLookup<DisableAutoTargetTag> disableAutoTarget,
+        public static bool GetFarEnemy(Entity attacker, CollisionWorld world, float3 pos, float radius, ComponentLookup<CreatureTag> creatureLookup, ComponentLookup<InDeadState> deadLookup, ComponentLookup<DisableAutoTargetTag> disableAutoTarget,
             ETeamId teamId, out Entity result, EHitRule hitRule = EHitRule.Enemy)
         {
             result = Entity.Null;
@@ -156,7 +156,7 @@ namespace Dots
         }
 
         public static NativeList<Entity> OverlapEnemies(Entity attacker, CollisionWorld world, float3 pos, float radius, 
-            ComponentLookup<CreatureTag> creatureLookup, ComponentLookup<InDeadTag> deadLookup, ETeamId teamId,
+            ComponentLookup<CreatureTag> creatureLookup, ComponentLookup<InDeadState> deadLookup, ETeamId teamId,
             EHitRule hitRule = EHitRule.Enemy)
         {
             var enemyLayer = GetLayer(teamId, hitRule);
@@ -190,7 +190,7 @@ namespace Dots
         }
 
         public static NativeList<Entity> RayCastEnemy(Entity attacker, CollisionWorld world, float3 pos, float3 direction, float castDist, ComponentLookup<CreatureTag> creatureLookup,
-            ComponentLookup<InDeadTag> deadLookup, ETeamId teamId, EHitRule hitRule)
+            ComponentLookup<InDeadState> deadLookup, ETeamId teamId, EHitRule hitRule)
         {
             var enemyLayer = GetLayer(teamId, hitRule);
             var result = new NativeList<Entity>(Allocator.Temp);
@@ -229,7 +229,7 @@ namespace Dots
         }
 
         public static NativeList<Entity> SphereCastAllEnemies(Entity attacker, CollisionWorld world, float3 pos, float3 direction, float castDist, float radius,
-            ComponentLookup<CreatureTag> creatureLookup, ComponentLookup<InDeadTag> deadLookup, ETeamId teamId, EHitRule hitRule)
+            ComponentLookup<CreatureTag> creatureLookup, ComponentLookup<InDeadState> deadLookup, ETeamId teamId, EHitRule hitRule)
         {
             var enemyLayer = GetLayer(teamId, hitRule);
 

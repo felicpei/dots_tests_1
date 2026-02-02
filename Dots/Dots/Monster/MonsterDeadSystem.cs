@@ -17,10 +17,10 @@ namespace Dots
         [ReadOnly] private ComponentLookup<LocalToWorld> _localToWorldLookup;
         [ReadOnly] private ComponentLookup<ProgressBarComponent> _progressBarLookup;
         [ReadOnly] private ComponentLookup<EffectProperties> _effectLookup;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private ComponentLookup<MonsterMove> _monsterMoveLookup;
         [ReadOnly] private BufferLookup<SummonEntities> _summonEntitiesLookup;
         [ReadOnly] private ComponentLookup<HybridEvent_SetActive> _eventSetActive;
@@ -40,10 +40,10 @@ namespace Dots
             _localToWorldLookup = state.GetComponentLookup<LocalToWorld>(true);
             _progressBarLookup = state.GetComponentLookup<ProgressBarComponent>(true);
             _effectLookup = state.GetComponentLookup<EffectProperties>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
             _cacheLookup = state.GetComponentLookup<CacheProperties>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _childLookup = state.GetBufferLookup<Child>(true);
             _monsterMoveLookup = state.GetComponentLookup<MonsterMove>(true);
             _summonEntitiesLookup =  state.GetBufferLookup<SummonEntities>(true);
@@ -75,7 +75,7 @@ namespace Dots
             _deadLookup.Update(ref state);
             _skillTagLookup.Update(ref state);
             _cacheLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _childLookup.Update(ref state);
             _monsterMoveLookup.Update(ref state);
             _summonEntitiesLookup.Update(ref state);
@@ -101,7 +101,7 @@ namespace Dots
                 DeadLookup = _deadLookup,
                 CacheEntity = cacheEntity,
                 CacheLookup = _cacheLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
                 ChildLookup = _childLookup,
                 MonsterMoveLookup = _monsterMoveLookup,
                 EventSetActive = _eventSetActive,
@@ -130,9 +130,9 @@ namespace Dots
             [ReadOnly] public BufferLookup<SkillEntities> SkillEntitiesLookup;
             [ReadOnly] public ComponentLookup<SkillTag> SkillTagLookup;
             [ReadOnly] public ComponentLookup<EffectProperties> EffectLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
             [ReadOnly] public ComponentLookup<HybridEvent_SetActive> EventSetActive;
             [ReadOnly] public ComponentLookup<MonsterMove> MonsterMoveLookup;
             [ReadOnly] public BufferLookup<SummonEntities> SummonEntitiesLookup;
@@ -143,7 +143,10 @@ namespace Dots
             [ReadOnly] public ComponentLookup<MonsterDropGold> DropGoldLookup;
             
             [BurstCompile]
-            private void Execute(EnterDieTag enterDieTag, MonsterProperties monsterProperties, DynamicBuffer<MonsterDropInfo> dropList, RefRW<LocalTransform> localTransform, RefRW<RandomSeed> random, Entity entity, [EntityIndexInQuery] int sortKey)
+            private void Execute(EnterDieTag enterDieTag, MonsterProperties monsterProperties, 
+                CreatureTag creatureTag,
+                DynamicBuffer<MonsterDropInfo> dropList, RefRW<LocalTransform> localTransform,
+                RefRW<RandomSeed> random, Entity entity, [EntityIndexInQuery] int sortKey)
             {
                 if (!CacheHelper.GetMonsterConfig(monsterProperties.Id, CacheEntity, CacheLookup, out var config))
                 {
@@ -155,13 +158,8 @@ namespace Dots
                     return;
                 }
 
-                if (!CreatureLookup.TryGetComponent(entity, out var creature))
-                {
-                    return;
-                }
-
                 Ecb.SetComponentEnabled<EnterDieTag>(sortKey, entity, false);
-                Ecb.SetComponentEnabled<InDeadTag>(sortKey, entity, true);
+                Ecb.SetComponentEnabled<InDeadState>(sortKey, entity, true);
 
                 if (!enterDieTag.BanDrop)
                 {
@@ -270,7 +268,7 @@ namespace Dots
                 {
                     SpawnPointId = monsterProperties.SpawnPointId,
                     CollisionType = config.CollisionType,
-                    Type = creature.Type,
+                    Type = creatureTag.Type,
                     MonsterId = monsterProperties.Id,
                 });
 
@@ -310,18 +308,21 @@ namespace Dots
                 }
 
                 //召唤处理
-                if (CreatureLookup.HasComponent(creature.SummonParent))
+                if (SummonLookup.TryGetComponent(entity, out var summon))
                 {
-                    //如果自己是召唤物, 且自己是环绕运行的， 则要给Parent触发召唤物变化事件
-                    if (!enterDieTag.FromHatch && MonsterMoveLookup.TryGetComponent(entity, out var monsterMove) && monsterMove.Mode == EMonsterMoveMode.Round)
+                    if (SummonLookup.HasComponent(summon.SummonParent))
                     {
-                        Ecb.AppendToBuffer(sortKey, creature.SummonParent, new CreatureDataProcess { Type = ECreatureDataProcess.ResetSummonsAroundAngle, EntityValue = entity });
-                        Ecb.SetComponentEnabled<CreatureDataProcess>(sortKey, creature.SummonParent, true);
-                    }
+                        //如果自己是召唤物, 且自己是环绕运行的， 则要给Parent触发召唤物变化事件
+                        if (!enterDieTag.FromHatch && MonsterMoveLookup.TryGetComponent(entity, out var monsterMove) && monsterMove.Mode == EMonsterMoveMode.Round)
+                        {
+                            Ecb.AppendToBuffer(sortKey, summon.SummonParent, new CreatureDataProcess { Type = ECreatureDataProcess.ResetSummonsAroundAngle, EntityValue = entity });
+                            Ecb.SetComponentEnabled<CreatureDataProcess>(sortKey, summon.SummonParent, true);
+                        }
 
-                    //标志召唤物死亡，Parent要在列表中remove掉
-                    Ecb.AppendToBuffer(sortKey, creature.SummonParent, new CreatureDataProcess { Type = ECreatureDataProcess.SummonEntitiesDie, EntityValue = entity });
-                    Ecb.SetComponentEnabled<CreatureDataProcess>(sortKey, creature.SummonParent, true);
+                        //标志召唤物死亡，Parent要在列表中remove掉
+                        Ecb.AppendToBuffer(sortKey, summon.SummonParent, new CreatureDataProcess { Type = ECreatureDataProcess.SummonEntitiesDie, EntityValue = entity });
+                        Ecb.SetComponentEnabled<CreatureDataProcess>(sortKey, summon.SummonParent, true);
+                    }
                 }
             }
         }

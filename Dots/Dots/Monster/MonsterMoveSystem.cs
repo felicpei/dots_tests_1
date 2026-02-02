@@ -17,23 +17,23 @@ namespace Dots
     {
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
         [ReadOnly] private ComponentLookup<LocalToWorld> _localToWorldLookup;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<InDashingTag> _inDashLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
         [ReadOnly] private ComponentLookup<DisableMoveTag> _disableMoveLookup;
-        [ReadOnly] private ComponentLookup<InFreezeTag> _inFreezeLookup;
+        [ReadOnly] private ComponentLookup<InFreezeState> _inFreezeLookup;
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
         [ReadOnly] private ComponentLookup<MonsterTarget> _monsterTargetLookup;
         [ReadOnly] private ComponentLookup<ShieldProperties> _shieldLookup;
-        [ReadOnly] private ComponentLookup<InAttackTag> _attackTagLookup;
+        [ReadOnly] private ComponentLookup<CreatureProps> _propsLookup;
         [ReadOnly] private ComponentLookup<DisableAutoTargetTag> _disableAutoTargetLookup;
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
         [ReadOnly] private ComponentLookup<CreatureFps> _creatureFpsLookup;
-        [ReadOnly] private ComponentLookup<InRepelTag> _inRepelLookup;
+        [ReadOnly] private ComponentLookup<InRepelState> _inRepelLookup;
         [ReadOnly] private ComponentLookup<InBornTag> _inBornLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
@@ -48,23 +48,23 @@ namespace Dots
 
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
             _localToWorldLookup = state.GetComponentLookup<LocalToWorld>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _inDashLookup = state.GetComponentLookup<InDashingTag>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
             _disableMoveLookup = state.GetComponentLookup<DisableMoveTag>(true);
-            _inFreezeLookup = state.GetComponentLookup<InFreezeTag>(true);
+            _inFreezeLookup = state.GetComponentLookup<InFreezeState>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
             _monsterTargetLookup = state.GetComponentLookup<MonsterTarget>(true);
             _shieldLookup = state.GetComponentLookup<ShieldProperties>(true);
-            _attackTagLookup = state.GetComponentLookup<InAttackTag>(true);
+            _propsLookup = state.GetComponentLookup<CreatureProps>(true);
             _disableAutoTargetLookup = state.GetComponentLookup<DisableAutoTargetTag>(true);
             _cacheLookup = state.GetComponentLookup<CacheProperties>(true);
             _creatureFpsLookup = state.GetComponentLookup<CreatureFps>(true);
-            _inRepelLookup = state.GetComponentLookup<InRepelTag>(true);
+            _inRepelLookup = state.GetComponentLookup<InRepelState>(true);
             _inBornLookup = state.GetComponentLookup<InBornTag>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
@@ -88,7 +88,7 @@ namespace Dots
             _localToWorldLookup.Update(ref state);
             _deadLookup.Update(ref state);
             _inDashLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _skillEntitiesLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
@@ -98,7 +98,7 @@ namespace Dots
             _skillTagLookup.Update(ref state);
             _monsterTargetLookup.Update(ref state);
             _shieldLookup.Update(ref state);
-            _attackTagLookup.Update(ref state);
+            _propsLookup.Update(ref state);
             _disableAutoTargetLookup.Update(ref state);
             _cacheLookup.Update(ref state);
             _creatureFpsLookup.Update(ref state);
@@ -129,14 +129,14 @@ namespace Dots
                 InDeadLookup = _deadLookup,
                 InFreezeLookup = _inFreezeLookup,
                 DisableMoveLookup = _disableMoveLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
                 ShieldLookup = _shieldLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
                 BuffTagLookup = _buffTagLookup,
                 BuffCommonLookup = _buffCommonLookup,
                 MonsterTargetLookup = _monsterTargetLookup,
                 LocalToWorldLookup = _localToWorldLookup,
-                AttackTagLookup = _attackTagLookup,
+                PropsLookup = _propsLookup,
                 CreatureFpsLookup = _creatureFpsLookup,
                 DisableAutoTargetLookup = _disableAutoTargetLookup,
                 SkillEntitiesLookup = _skillEntitiesLookup,
@@ -166,18 +166,18 @@ namespace Dots
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
             [ReadOnly] public ComponentLookup<CreatureTag> CreatureTag;
             [ReadOnly] public ComponentLookup<InDashingTag> InDashLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> InDeadLookup;
-            [ReadOnly] public ComponentLookup<InFreezeTag> InFreezeLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> InDeadLookup;
+            [ReadOnly] public ComponentLookup<InFreezeState> InFreezeLookup;
             [ReadOnly] public ComponentLookup<DisableMoveTag> DisableMoveLookup;
-            [ReadOnly] public ComponentLookup<InRepelTag> InRepelLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<InRepelState> InRepelLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
             [ReadOnly] public ComponentLookup<ShieldProperties> ShieldLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
             [ReadOnly] public ComponentLookup<MonsterTarget> MonsterTargetLookup;
             [ReadOnly] public ComponentLookup<LocalToWorld> LocalToWorldLookup;
-            [ReadOnly] public ComponentLookup<InAttackTag> AttackTagLookup;
+            [ReadOnly] public ComponentLookup<CreatureProps> PropsLookup;
             [ReadOnly] public ComponentLookup<DisableAutoTargetTag> DisableAutoTargetLookup;
             [ReadOnly] public BufferLookup<SkillEntities> SkillEntitiesLookup;
             [ReadOnly] public ComponentLookup<SkillTag> SkillTagLookup;
@@ -187,7 +187,7 @@ namespace Dots
             [ReadOnly] public BufferLookup<PlayerAttrModify> AttrModifyLookup;
             
             [BurstCompile]
-            private void Execute(RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove,
+            private void Execute(RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove,
                 RefRW<LocalTransform> localTransform, RefRW<RandomSeed> random, RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
                 MonsterProperties monsterProperties, Entity entity, [EntityIndexInQuery] int sortKey)
             {
@@ -210,12 +210,12 @@ namespace Dots
                     return;
                 }
 
-                if (!CreatureLookup.TryGetComponent(entity, out var creature))
+                if (!CreatureTag.TryGetComponent(entity, out var creature))
                 {
                     return;
                 }
 
-                if (InMonsterPause && creature.AtkValue.Team == ETeamId.Monster)
+                if (InMonsterPause && creature.TeamId == ETeamId.Monster)
                 {
                     StopMove(agentBody, creatureMove);
                     return;
@@ -226,10 +226,10 @@ namespace Dots
                 var speed = 0f;
 
                 //计算移动速度
-                var addSpeedFactor = CreatureHelper.GetMoveSpeedFactor(entity, CreatureLookup, ShieldLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, AttrLookup, AttrModifyLookup);
+                var addSpeedFactor = CreatureHelper.GetMoveSpeedFactor(entity, SummonLookup, PropsLookup, ShieldLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, AttrLookup, AttrModifyLookup);
 
                 //attr enemy speed
-                addSpeedFactor += AttrHelper.GetAttr(LocalPlayerEntity, EAttr.EnemySpeed, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                addSpeedFactor += AttrHelper.GetAttr(LocalPlayerEntity, EAttr.EnemySpeed, AttrLookup, AttrModifyLookup, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
 
                 var minSpeedFac = AttrHelper.GetMin(EAttr.EnemySpeed);
                 if (addSpeedFactor < minSpeedFac)
@@ -251,12 +251,12 @@ namespace Dots
                     }
                     case EMonsterMoveMode.Round:
                     {
-                        bMoved = AroundMove(DeltaTime, entity, addSpeedFactor, tag, creatureMove, localTransform, agentBody, locomotion, monsterProperties, MonsterTargetLookup, CreatureLookup, LocalToWorldLookup, out forward, out speed);
+                        bMoved = AroundMove(DeltaTime, entity, addSpeedFactor, tag, creatureMove, localTransform, agentBody, locomotion, monsterProperties, MonsterTargetLookup, SummonLookup, LocalToWorldLookup, out forward, out speed);
                         break;
                     }
                     case EMonsterMoveMode.RandomEnemy:
                     {
-                        bMoved = RandomEnemy(DeltaTime, entity, addSpeedFactor, tag, creatureMove, localTransform, agentBody, locomotion, random, CollisionWorld, CreatureLookup, CreatureTag, InDeadLookup, LocalToWorldLookup, DisableAutoTargetLookup, out forward, out speed);
+                        bMoved = RandomEnemy(DeltaTime, entity, addSpeedFactor, tag, creatureMove, localTransform, agentBody, locomotion, random, CollisionWorld, SummonLookup, CreatureTag, InDeadLookup, LocalToWorldLookup, DisableAutoTargetLookup, out forward, out speed);
                         break;
                     }
                     case EMonsterMoveMode.ToFormationCenter:
@@ -315,17 +315,17 @@ namespace Dots
                 }
 
                 //风速影响
-                CreatureHelper.CalcWindPos(LocalPlayerEntity, entity, DeltaTime, localTransform, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                CreatureHelper.CalcWindPos(LocalPlayerEntity, entity, DeltaTime, localTransform, CreatureTag, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
             }
         }
 
-        private static void MoveToPos(float3 targetPos, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform)
+        private static void MoveToPos(float3 targetPos, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform)
         {
             localTransform.ValueRW.Position = targetPos;
             creatureMove.ValueRW.InMove = true;
         }
 
-        private static void StopMove(RefRW<AgentBody> agentBody, RefRW<CreatureMove> creature)
+        private static void StopMove(RefRW<AgentBody> agentBody, RefRW<StatusMove> creature)
         {
             agentBody.ValueRW.Stop();
             if (creature.ValueRO.InMove)
@@ -335,7 +335,7 @@ namespace Dots
         }
 
         private static bool DirectMove(float deltaTime, Entity entity,  float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
             ComponentLookup<MonsterTarget> monsterTargetLookup, out float3 forward, out float speed)
         {
@@ -383,7 +383,7 @@ namespace Dots
         }
 
         private static bool PatrolRandomPoint(float deltaTime, Entity entity,  float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
             RefRW<RandomSeed> random, CollisionWorld world, out float3 forward, out float speed)
         {
@@ -442,7 +442,7 @@ namespace Dots
         }
 
         private static bool KeepDist(float deltaTime, Entity entity, float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
             ComponentLookup<MonsterTarget> monsterTargetLookup, CollisionWorld collisionWorld, out float3 forward, out float speed)
         {
@@ -553,10 +553,10 @@ namespace Dots
         }
 
         private static bool AroundMove(float deltaTime, Entity entity,  float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
             MonsterProperties monsterProperties, ComponentLookup<MonsterTarget> monsterTargetLookup,
-            ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<LocalToWorld> localToWorldLookup,
+            ComponentLookup<StatusSummon> summonLookup, ComponentLookup<LocalToWorld> localToWorldLookup,
             out float3 forward, out float speed)
         {
             var configSpeed = tag.ValueRO.Param2;
@@ -577,9 +577,9 @@ namespace Dots
             creatureMove.ValueRW.MoveSpeedResult = speed;
 
             var centerPos = monsterProperties.BornPos;
-            if (creatureLookup.TryGetComponent(entity, out var creature))
+            if (summonLookup.TryGetComponent(entity, out var creature))
             {
-                if (creatureLookup.HasComponent(creature.SummonParent) && localToWorldLookup.TryGetComponent(creature.SummonParent, out var parentTransform))
+                if (summonLookup.HasComponent(creature.SummonParent) && localToWorldLookup.TryGetComponent(creature.SummonParent, out var parentTransform))
                 {
                     centerPos = parentTransform.Position;
                 }
@@ -611,7 +611,7 @@ namespace Dots
         }
 
         private static bool ToCenter(float deltaTime, Entity entity,  float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
             out float3 forward, out float speed)
         {
@@ -666,10 +666,10 @@ namespace Dots
         }
 
         private static bool RandomEnemy(float deltaTime, Entity entity,  float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
-            RefRW<RandomSeed> random, CollisionWorld collisionWorld, ComponentLookup<CreatureProperties> creatureLookup,
-            ComponentLookup<CreatureTag> creatureTag, ComponentLookup<InDeadTag> deadLookup,
+            RefRW<RandomSeed> random, CollisionWorld collisionWorld, ComponentLookup<StatusSummon> summonLookup,
+            ComponentLookup<CreatureTag> creatureTag, ComponentLookup<InDeadState> deadLookup,
             ComponentLookup<LocalToWorld> localToWorldLookup, ComponentLookup<DisableAutoTargetTag> disableAutoTargetLookup, out float3 faceForward, out float speed)
         {
             var minDist = tag.ValueRO.Param1;
@@ -687,9 +687,9 @@ namespace Dots
 
             var bHasParent = false;
             var parentPos = float3.zero;
-            if (creatureLookup.TryGetComponent(entity, out var creature))
+            if (summonLookup.TryGetComponent(entity, out var creature))
             {
-                if (creatureLookup.HasComponent(creature.SummonParent) && localToWorldLookup.TryGetComponent(creature.SummonParent, out var parentTransform))
+                if (summonLookup.HasComponent(creature.SummonParent) && localToWorldLookup.TryGetComponent(creature.SummonParent, out var parentTransform))
                 {
                     parentPos = parentTransform.Position;
                     bHasParent = true;
@@ -697,9 +697,9 @@ namespace Dots
             }
 
             //寻找目标
-            if (tag.ValueRO.CurrentTarget == Entity.Null && creatureLookup.TryGetComponent(entity, out var entityCreature))
+            if (tag.ValueRO.CurrentTarget == Entity.Null && creatureTag.TryGetComponent(entity, out var entityCreature))
             {
-                var enemies = PhysicsHelper.OverlapEnemies(entity, collisionWorld, localTransform.ValueRO.Position, maxDist, creatureTag, deadLookup, entityCreature.AtkValue.Team);
+                var enemies = PhysicsHelper.OverlapEnemies(entity, collisionWorld, localTransform.ValueRO.Position, maxDist, creatureTag, deadLookup, entityCreature.TeamId);
                 var randomEnemies = new NativeList<Entity>(Allocator.Temp);
 
                 var totalCount = 0;
@@ -805,7 +805,7 @@ namespace Dots
         }
 
         private static bool MoveLR(float deltaTime, Entity entity,  float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
             float4 screenBound, EntityCommandBuffer.ParallelWriter ecb, int sortKey, out float3 forward, out float speed)
         {
@@ -874,7 +874,7 @@ namespace Dots
 
 
         private static bool PatrolLR(float deltaTime, Entity entity,  float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
             ComponentLookup<MonsterTarget> monsterTargetLookup, out float3 forward, out float speed)
         {
@@ -932,7 +932,7 @@ namespace Dots
         }
 
         private static bool PatrolDir(float deltaTime, Entity entity,  float addSpeedFactor,
-            RefRW<MonsterMove> tag, RefRW<CreatureMove> creatureMove, RefRW<LocalTransform> localTransform,
+            RefRW<MonsterMove> tag, RefRW<StatusMove> creatureMove, RefRW<LocalTransform> localTransform,
             RefRW<AgentBody> agentBody, RefRW<AgentLocomotion> locomotion,
             ComponentLookup<MonsterTarget> monsterTargetLookup, EntityCommandBuffer.ParallelWriter ecb, int sortKey, out float3 forward, out float speed)
         {

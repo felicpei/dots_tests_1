@@ -14,7 +14,7 @@ namespace Dots
     public partial struct CreatureRepelCdSystem : ISystem
     {
         private EntityQuery _query;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -25,7 +25,7 @@ namespace Dots
             _query = state.GetEntityQuery(queryBuilder);
             queryBuilder.Dispose();
 
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
         }
 
         [BurstCompile]
@@ -70,7 +70,7 @@ namespace Dots
         {
             public EntityCommandBuffer.ParallelWriter Ecb;
             public float DeltaTime;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
 
             [BurstCompile]
             private void Execute(RefRW<CreatureRepelCd> hitCd, Entity entity, [EntityIndexInQuery] int sortKey)

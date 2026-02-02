@@ -29,9 +29,10 @@ namespace Dots
             {
                 sourceValue *= 1f / (1 - addFactor);
             }
+
             return sourceValue;
         }
-        
+
         public static float CalcFactorSpeed(float sourceValue, float addFactor)
         {
             var speed = 1f / sourceValue;
@@ -43,6 +44,7 @@ namespace Dots
             {
                 speed *= 1f / (1 - addFactor);
             }
+
             return 1f / speed;
         }
 
@@ -58,8 +60,8 @@ namespace Dots
             ecb.AppendToBuffer(globalEntity, createBuffer);
         }
 
-        public static void AddBuff(GlobalAspect global, CacheAspect cache, CreateBuffData buffer, 
-            ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<DisableBuffTag> disableBuffTagLookup,
+        public static void AddBuff(GlobalAspect global, CacheAspect cache, CreateBuffData buffer,
+            ComponentLookup<StatusSummon> summonLookup, ComponentLookup<DisableBuffTag> disableBuffTagLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup,
             ComponentLookup<LocalTransform> transformLookup, ComponentLookup<BuffCommonData> buffCommonLookup, EntityCommandBuffer ecb)
         {
@@ -102,7 +104,7 @@ namespace Dots
 
                 if (!bOverlap)
                 {
-                    FactoryHelper.CreateBuff(buffer.Master, buffer, global, cache, creatureLookup, transformLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, ecb);
+                    FactoryHelper.CreateBuff(buffer.Master, buffer, global, cache, summonLookup, transformLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, ecb);
                 }
             }
         }
@@ -121,7 +123,7 @@ namespace Dots
                 }
             }
         }
-        
+
         public static void RemoveAllBuff(Entity entity, BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffLookup, EntityCommandBuffer ecb)
         {
             if (buffEntitiesLookup.TryGetBuffer(entity, out var buffs))
@@ -198,7 +200,7 @@ namespace Dots
                 }
             }
         }
-        
+
         public static void RemoveBuffById(int buffId, Entity entity, BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffLookup, EntityCommandBuffer ecb)
         {
             if (buffEntitiesLookup.TryGetBuffer(entity, out var buffs))
@@ -256,6 +258,7 @@ namespace Dots
                         return false;
                     }
                 }
+
                 return true;
             }
 
@@ -297,25 +300,27 @@ namespace Dots
             return false;
         }
 
-        public static float CalcContTime(float source, Entity master, ComponentLookup<CreatureProperties> creatureLookup,
+        public static float CalcContTime(float source, Entity master, ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
         {
             //buff contTime
-            var addFactor = GetBuffAddFactor(master, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.ContTime);
+            var addFactor = GetBuffAddFactor(master, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.ContTime);
             source = CalcFactor(source, addFactor);
             return source;
         }
 
-        public static float CalcDamageInterval(float damageInterval, BulletConfig bulletConfig, Entity master, ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> modifyLookup,
+        public static float CalcDamageInterval(float damageInterval, BulletConfig bulletConfig, Entity master,
+            ComponentLookup<StatusSummon> summonLookup, ComponentLookup<PlayerAttrData> attrLookup,
+            BufferLookup<PlayerAttrModify> modifyLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
         {
-            var addFactor = GetBuffAddFactor(master, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletDamageInterval, bulletConfig.Id, bulletConfig.ClassId);
-            addFactor += AttrHelper.GetAttr(master, EAttr.DamageInterval, attrLookup, modifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
-            
+            var addFactor = GetBuffAddFactor(master, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletDamageInterval, bulletConfig.Id, bulletConfig.ClassId);
+            addFactor += AttrHelper.GetAttr(master, EAttr.DamageInterval, attrLookup, modifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+
             return CalcFactorSpeed(damageInterval, addFactor);
         }
 
-        public static NativeList<int> GetBuffAttachInt(Entity master, ComponentLookup<CreatureProperties> creatureLookup,
+        public static NativeList<int> GetBuffAttachInt(Entity master, ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             EBuffType buffType, int checkTargetInt1 = 0, int checkTargetInt2 = 0, int checkTargetInt3 = 0, bool checkingParent = false, int fromMonsterId = 0)
         {
@@ -350,12 +355,12 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                var resultParent = GetBuffAttachInt(creature.SummonParent, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType,
+                var resultParent = GetBuffAttachInt(creature.SummonParent, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType,
                     checkTargetInt1, checkTargetInt2, checkTargetInt3, true, creature.SelfConfigId);
-                
+
                 for (var i = 0; i < resultParent.Length; i++)
                 {
                     result.Add(resultParent[i]);
@@ -367,7 +372,7 @@ namespace Dots
             return result;
         }
 
-        public static float GetBuffAddFactor(Entity master, ComponentLookup<CreatureProperties> creatureLookup,
+        public static float GetBuffAddFactor(Entity master, ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             EBuffType buffType, int checkTargetInt1 = 0, int checkTargetInt2 = 0, bool checkTargetBool = false, float checkFloat = 0, bool checkingParent = false, int fromMonsterId = 0)
         {
@@ -416,17 +421,17 @@ namespace Dots
 
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                addFactor += GetBuffAddFactor(creature.SummonParent, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType,
+                addFactor += GetBuffAddFactor(creature.SummonParent, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType,
                     checkTargetInt1, checkTargetInt2, checkTargetBool, checkFloat, true, creature.SelfConfigId);
             }
 
             return addFactor;
         }
 
-        public static float GetBuffAddValue(Entity master, ComponentLookup<CreatureProperties> creatureLookup,
+        public static float GetBuffAddValue(Entity master, ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             EBuffType buffType, int checkTargetInt1 = 0, int checkTargetInt2 = 0, bool checkingParent = false, int fromMonsterId = 0)
         {
@@ -457,17 +462,17 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                addValue += GetBuffAddValue(creature.SummonParent, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType,
+                addValue += GetBuffAddValue(creature.SummonParent, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType,
                     checkTargetInt1, checkTargetInt2, true, creature.SelfConfigId);
             }
 
             return addValue;
         }
 
-        public static bool GetHasBuff(Entity master, ComponentLookup<CreatureProperties> creatureLookup,
+        public static bool GetHasBuff(Entity master, ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             EBuffType buffType, int checkTargetInt1 = 0, bool checkingParent = false, int fromMonsterId = 0)
         {
@@ -492,10 +497,10 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                if (GetHasBuff(creature.SummonParent, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType, checkTargetInt1, true, creature.SelfConfigId))
+                if (GetHasBuff(creature.SummonParent, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType, checkTargetInt1, true, creature.SelfConfigId))
                 {
                     return true;
                 }
@@ -511,7 +516,7 @@ namespace Dots
             public float TempData;
         }
 
-        public static BuffResult GetBuffFactorAndValue(Entity master, ComponentLookup<CreatureProperties> creatureLookup,
+        public static BuffResult GetBuffFactorAndValue(Entity master, ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             EBuffType buffType, int checkTargetInt1 = 0, int checkTargetInt2 = 0, bool checkBool = false, float checkFloat = 0, bool checkingParent = false, int fromMonsterId = 0)
         {
@@ -561,10 +566,10 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                var parentResult = GetBuffFactorAndValue(creature.SummonParent, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType,
+                var parentResult = GetBuffFactorAndValue(creature.SummonParent, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, buffType,
                     checkTargetInt1, checkTargetInt2, checkBool, checkFloat, true, creature.SelfConfigId);
 
                 result.AddFactor += parentResult.AddFactor;
@@ -575,7 +580,7 @@ namespace Dots
             return result;
         }
 
-        public static float GetBuffFactorByTempPercent(EBuffType buffType, float curPercent, Entity master, ComponentLookup<CreatureProperties> creatureLookup,
+        public static float GetBuffFactorByTempPercent(EBuffType buffType, float curPercent, Entity master, ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup, bool checkingParent = false, int fromMonsterId = 0)
         {
             var totalAddFactor = 0f;
@@ -609,17 +614,18 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                totalAddFactor += GetBuffFactorByTempPercent(buffType, curPercent, creature.SummonParent, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, true, creature.SelfConfigId);
+                totalAddFactor += GetBuffFactorByTempPercent(buffType, curPercent, creature.SummonParent, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, true, creature.SelfConfigId);
             }
 
             return totalAddFactor;
         }
 
 
-        public static NativeList<int> GetAppendBuffList(Entity master, EBuffType buffType, int checkInt1, int checkInt2, ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<BuffAppendRandomIds> buffAppendRandomIds,
+        public static NativeList<int> GetAppendBuffList(Entity master, EBuffType buffType, int checkInt1, int checkInt2,
+            ComponentLookup<StatusSummon> summonLookup, ComponentLookup<BuffAppendRandomIds> buffAppendRandomIds,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, bool checkingParent = false, int fromMonsterId = 0)
         {
             var buffList = new NativeList<int>(Allocator.Temp);
@@ -653,10 +659,10 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                var parentList = GetAppendBuffList(creature.SummonParent, buffType, checkInt1, checkInt2, creatureLookup, buffAppendRandomIds, buffEntitiesLookup, buffTagLookup, true, creature.SelfConfigId);
+                var parentList = GetAppendBuffList(creature.SummonParent, buffType, checkInt1, checkInt2, summonLookup, buffAppendRandomIds, buffEntitiesLookup, buffTagLookup, true, creature.SelfConfigId);
                 for (var i = 0; i < parentList.Length; i++)
                 {
                     buffList.Add(parentList[i]);
@@ -669,7 +675,8 @@ namespace Dots
         }
 
         //检查敌人的buff来增加伤害，可影响召唤物
-        public static float GetDamageByEnemyBuffFactor(BulletConfig bulletConfig, Entity attacker, Entity hitCreature, ComponentLookup<CreatureProperties> creatureLookup,
+        public static float GetDamageByEnemyBuffFactor(BulletConfig bulletConfig, Entity attacker, Entity hitCreature,
+            ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup, bool checkingParent = false, int fromMonsterId = 0)
         {
             var addFactor = 0f;
@@ -706,17 +713,17 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(attacker, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(attacker, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                addFactor += GetDamageByEnemyBuffFactor(bulletConfig, creature.SummonParent, hitCreature, 
-                    creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, true, creature.SelfConfigId);
+                addFactor += GetDamageByEnemyBuffFactor(bulletConfig, creature.SummonParent, hitCreature,
+                    summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, true, creature.SelfConfigId);
             }
 
             return addFactor;
         }
 
-        public static bool CheckBuffProb(Entity master, ComponentLookup<CreatureProperties> creatureLookup, RefRW<RandomSeed> random, EBuffType buffType,
+        public static bool CheckBuffProb(Entity master, ComponentLookup<StatusSummon> summonLookup, RefRW<RandomSeed> random, EBuffType buffType,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup, out int attachInt, bool checkingParent = false, int fromMonsterId = 0)
         {
             attachInt = 0;
@@ -725,7 +732,7 @@ namespace Dots
             {
                 foreach (var buffEntity in hitBuffers)
                 {
-                    if (CheckBuffTag(buffType,buffEntity.Value, buffTagLookup, checkingParent, fromMonsterId))
+                    if (CheckBuffTag(buffType, buffEntity.Value, buffTagLookup, checkingParent, fromMonsterId))
                     {
                         if (buffCommonLookup.TryGetComponent(buffEntity.Value, out var buffData))
                         {
@@ -741,24 +748,26 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                if (CheckBuffProb(creature.SummonParent, creatureLookup, random, buffType, buffEntitiesLookup, buffTagLookup, buffCommonLookup, out var attachInt2, true, creature.SelfConfigId))
+                if (CheckBuffProb(creature.SummonParent, summonLookup, random, buffType, buffEntitiesLookup, buffTagLookup, buffCommonLookup, out var attachInt2, true, creature.SelfConfigId))
                 {
                     if (attachInt2 != 0)
                     {
                         attachInt = attachInt2;
                     }
+
                     return true;
                 }
             }
+
             return false;
         }
 
         //处理吸血
         public static void ProcessTransfusionBuff(Entity entity, float damageResult, BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup,
-            ComponentLookup<BuffTransfusion> buffTransfusion, ComponentLookup<CreatureProperties> creatureLookup, EntityCommandBuffer ecb, bool checkingParent = false, int fromMonsterId = 0)
+            ComponentLookup<BuffTransfusion> buffTransfusion, ComponentLookup<StatusSummon> summonLookup, EntityCommandBuffer ecb, bool checkingParent = false, int fromMonsterId = 0)
         {
             if (buffEntitiesLookup.TryGetBuffer(entity, out var buffEntities))
             {
@@ -768,7 +777,7 @@ namespace Dots
                     {
                         if (buffTransfusion.TryGetComponent(buffEntity.Value, out var buff) && buffTransfusion.IsComponentEnabled(buffEntity.Value))
                         {
-                            if (creatureLookup.HasComponent(buff.Attacker))
+                            if (summonLookup.HasComponent(buff.Attacker))
                             {
                                 var addHp = damageResult * buff.Factor;
                                 if (addHp > 0)
@@ -783,31 +792,37 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(entity, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(entity, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                ProcessTransfusionBuff(creature.SummonParent, damageResult, buffEntitiesLookup, buffTagLookup, buffTransfusion, creatureLookup, ecb, true, creature.SelfConfigId);
+                ProcessTransfusionBuff(creature.SummonParent, damageResult, buffEntitiesLookup, buffTagLookup, buffTransfusion, summonLookup, ecb, true, creature.SelfConfigId);
             }
         }
 
-        public static bool CheckExecutionBuff(Entity master, float damageResult, GlobalAspect global, Entity hitEntity, ComponentLookup<CreatureProperties> creatureLookup,
-            BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup,  ComponentLookup<BuffCommonData> buffCommonLookup,
+        public static bool CheckExecutionBuff(Entity master, float damageResult, GlobalAspect global, Entity hitEntity,
+            ComponentLookup<StatusSummon> summonLookup, ComponentLookup<StatusHp> hpLookup, ComponentLookup<CreatureTag> creatureLookup,
+            BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> modifyLookup,
             out int effectId, bool checkingParent = false, int fromMonsterId = 0)
         {
             effectId = 0;
+
+            if (!hpLookup.TryGetComponent(hitEntity, out var hpInfo))
+            {
+                return false;
+            }
 
             if (!creatureLookup.TryGetComponent(hitEntity, out var hitCreature))
             {
                 return false;
             }
 
-            if (hitCreature.CurHp - damageResult <= 0)
+            if (hpInfo.CurHp - damageResult <= 0)
             {
                 return false;
             }
 
-            var hitHpPercent = (hitCreature.CurHp - damageResult) / AttrHelper.GetMaxHp(hitEntity, attrLookup, modifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+            var hitHpPercent = (hpInfo.CurHp - damageResult) / AttrHelper.GetMaxHp(hitEntity, attrLookup, modifyLookup, hpLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
 
             if (buffEntitiesLookup.TryGetBuffer(master, out var buffEntities))
             {
@@ -847,10 +862,10 @@ namespace Dots
             }
 
             //如果自己是召唤物，则需要查看parent的buff
-            if (creatureLookup.TryGetComponent(master, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            if (summonLookup.TryGetComponent(master, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 //检查parent身上是否有该buff会影响自己    
-                if (CheckExecutionBuff(creature.SummonParent, damageResult, global, hitEntity, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, attrLookup, modifyLookup, out effectId, true, creature.SelfConfigId))
+                if (CheckExecutionBuff(creature.SummonParent, damageResult, global, hitEntity, summonLookup, hpLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, attrLookup, modifyLookup, out effectId, checkingParent, fromMonsterId))
                 {
                     return true;
                 }

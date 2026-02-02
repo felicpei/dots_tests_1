@@ -18,6 +18,11 @@ namespace Dots
         public Entity Target;
         public float3 Pos;
     }
+    
+    public struct MasterCreature : IComponentData
+    {
+        public Entity Value;
+    }
 
     public struct SkillTag : IComponentData
     {

@@ -1,11 +1,7 @@
-using Dots;
-using Dots;
-using Dots;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
-using UnityEngine;
 
 namespace Dots
 {
@@ -14,8 +10,8 @@ namespace Dots
     [UpdateInGroup(typeof(CreatureSystemGroup))]
     public partial struct CreatureColorSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InFreezeTag> _inFreezeLookup;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InFreezeState> _inFreezeLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
@@ -26,8 +22,8 @@ namespace Dots
             state.RequireForUpdate<GlobalInitialized>();
             state.RequireForUpdate<CacheProperties>();
             
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
-            _inFreezeLookup = state.GetComponentLookup<InFreezeTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
+            _inFreezeLookup = state.GetComponentLookup<InFreezeState>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _cacheLookup = state.GetComponentLookup<CacheProperties>(true);
@@ -77,8 +73,8 @@ namespace Dots
             public float DeltaTime;
             public Entity CacheEntity;
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
-            [ReadOnly] public ComponentLookup<InFreezeTag> InFreezeLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
+            [ReadOnly] public ComponentLookup<InFreezeState> InFreezeLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
   

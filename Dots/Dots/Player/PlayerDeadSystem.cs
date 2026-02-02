@@ -11,7 +11,7 @@ namespace Dots
     [UpdateInGroup(typeof(PlayerSystemGroup))]
     public partial struct PlayerDeadSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
         [ReadOnly] private ComponentLookup<HybridEvent_SetActive> _eventSetActive;
@@ -22,7 +22,7 @@ namespace Dots
             state.RequireForUpdate<GlobalInitialized>();
             state.RequireForUpdate<CacheProperties>();
             
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
             _eventSetActive = state.GetComponentLookup<HybridEvent_SetActive>(true);
@@ -49,8 +49,8 @@ namespace Dots
             _skillTagLookup.Update(ref state);
             _eventSetActive.Update(ref state);
 
-            foreach (var (tag, localTransform, creature, entity) in 
-                     SystemAPI.Query<EnterDieTag, LocalTransform, RefRW<CreatureProperties>>().WithAll<LocalPlayerTag>().WithEntityAccess())
+            foreach (var (tag, entity) in 
+                     SystemAPI.Query<EnterDieTag>().WithAll<LocalPlayerTag>().WithEntityAccess())
             {
                 if (_deadLookup.HasComponent(entity) && _deadLookup.IsComponentEnabled(entity))
                 {
@@ -60,7 +60,7 @@ namespace Dots
                 ecb.SetComponentEnabled<EnterDieTag>(entity, false);
 
                 //死亡标志
-                ecb.SetComponentEnabled<InDeadTag>(entity, true);
+                ecb.SetComponentEnabled<InDeadState>(entity, true);
 
                 //LocalPlayer 更新missionUI
                 ecb.AppendToBuffer( entity, new UIUpdateBuffer

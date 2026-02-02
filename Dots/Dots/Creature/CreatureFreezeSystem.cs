@@ -12,7 +12,7 @@ namespace Dots
     [UpdateInGroup(typeof(CreatureSystemGroup))]
     public partial struct CreatureFreezeSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<InBornTag> _inBornLookup;
 
         [BurstCompile]
@@ -21,7 +21,7 @@ namespace Dots
             state.RequireForUpdate<GlobalInitialized>();
             state.RequireForUpdate<CacheProperties>();
             
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _inBornLookup = state.GetComponentLookup<InBornTag>(true);
         }
 
@@ -47,7 +47,7 @@ namespace Dots
             var cache = SystemAPI.GetAspect<CacheAspect>(SystemAPI.GetSingletonEntity<CacheProperties>());
 
             //enter freeze
-            foreach (var (tag, creature, creatureFps, entity) in SystemAPI.Query<EnterFreezeTag, CreatureProperties, RefRW<CreatureFps>>().WithEntityAccess())
+            foreach (var (tag, creatureFps, entity) in SystemAPI.Query<EnterFreezeTag, RefRW<CreatureFps>>().WithEntityAccess())
             {
                 ecb.SetComponentEnabled<EnterFreezeTag>(entity, false);
 
@@ -56,7 +56,7 @@ namespace Dots
                     continue;
                 }
 
-                ecb.SetComponentEnabled<InFreezeTag>(entity, true);
+                ecb.SetComponentEnabled<InFreezeState>(entity, true);
 
                 if (!_inBornLookup.IsComponentEnabled(entity))
                 {
@@ -65,11 +65,11 @@ namespace Dots
             }
 
             //exit freeze
-            foreach (var (tag, creature, creatureFps, entity) in
-                     SystemAPI.Query<InFreezeTag, CreatureProperties, RefRW<CreatureFps>>().WithAll<RemoveFreezeTag>().WithEntityAccess())
+            foreach (var (tag, creatureFps, entity) in
+                     SystemAPI.Query<InFreezeState, RefRW<CreatureFps>>().WithAll<RemoveFreezeTag>().WithEntityAccess())
             {
                 ecb.SetComponentEnabled<RemoveFreezeTag>(entity, false);
-                ecb.SetComponentEnabled<InFreezeTag>(entity, false);
+                ecb.SetComponentEnabled<InFreezeState>(entity, false);
 
                 if (_deadLookup.IsComponentEnabled(entity))
                 {

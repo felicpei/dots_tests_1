@@ -18,7 +18,7 @@ namespace Dots
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
         [ReadOnly] private ComponentLookup<BuffTimeProperty> _buffTimeLookup;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<CreatureProps> _propsLookup;
         [ReadOnly] private ComponentLookup<MonsterProperties> _monsterLookup;
         [ReadOnly] private BufferLookup<SummonEntities> _summonEntitiesLookup;
 
@@ -40,12 +40,11 @@ namespace Dots
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _propsLookup = state.GetComponentLookup<CreatureProps>(true);
             _monsterLookup = state.GetComponentLookup<MonsterProperties>(true);
             _summonEntitiesLookup = state.GetBufferLookup<SummonEntities>(true);
             _bindingBulletLookup =  state.GetBufferLookup<BindingBullet>(true);
             _bulletLookup = state.GetComponentLookup<BulletProperties>(true);
-            
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>();
             _buffTransfusion = state.GetComponentLookup<BuffTransfusion>();
             _buffFreezeLookup = state.GetComponentLookup<BuffFreeze>();
@@ -71,7 +70,7 @@ namespace Dots
             _buffTimeLookup.Update(ref state);
             _skillEntitiesLookup.Update(ref state);
             _transformLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _propsLookup.Update(ref state);
             _monsterLookup.Update(ref state);
             _summonEntitiesLookup.Update(ref state);
             _skillTagLookup.Update(ref state);
@@ -95,7 +94,7 @@ namespace Dots
                 }
 
                 var masterCreature = properties.ValueRO.Master;
-                if (!_creatureLookup.HasComponent(masterCreature))
+                if (!_propsLookup.HasComponent(masterCreature))
                 {
                     continue;
                 }
@@ -172,7 +171,7 @@ namespace Dots
                             var bindBullet = config.BulletId;
                             if (bindBullet > 0)
                             {
-                                BulletHelper.BindBuffBullet(global, entity, _buffTagLookup, _creatureLookup, _bindingBulletLookup,
+                                BulletHelper.BindBuffBullet(global, entity, _buffTagLookup, _propsLookup, _bindingBulletLookup,
                                     _transformLookup, _bulletLookup, bindBullet, properties.ValueRO.Layer, ecb);
                             }  
                             break;

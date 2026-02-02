@@ -9,29 +9,35 @@ namespace Dots
     {
         public ECreatureType Type;
         public ETeamId TeamId;
+        public EElement BelongElementId;
+    }
+   
+    public struct CreatureProps : IComponentData
+    {
+        public AtkValue AtkValue;
+        public float OriginScale;
+        public float Def;
+        public float RepelCd;
+        public float SpeedFac;
     }
 
-    public struct CreatureProperties : IComponentData
+    public struct StatusCenter : IComponentData
     {
-        public ECreatureType Type;
-        public EElement BelongElementId;
-        
-        public AtkValue AtkValue;
+        public float CenterY;
+    }
+    
+    public struct StatusHp : IComponentData
+    {
         public float FullHp;
         public float CurHp;
         public float FullHpFactor;
-        
-        public float Def;
-        public float RepelCd;
-       
+    }
+    
+    public struct StatusSummon : IComponentData
+    {
+        public ECreatureType SelfType;
         public int SelfConfigId;
         public Entity SummonParent;
-        public float OriginScale;
-        
-        public bool InMoveCopy;
-        public float MoveSpeedCopy;
-        public float SpeedFac;
-        public float CenterY;
     }
 
     public struct StatusHpRecovery : IComponentData
@@ -45,6 +51,15 @@ namespace Dots
         public float Alpha;
         public bool InBuffColor;
     }
+    
+    public struct StatusMove : IComponentData
+    {
+        public float MoveSpeedSource;
+        public float MoveSpeedResult;
+        public bool InMove;
+        public float MoveDistTemp;
+    }
+    
 
     public struct BindingElement : IComponentData
     {
@@ -64,15 +79,9 @@ namespace Dots
         public float3 Value;
     }
     
-    public struct CreatureMove : IComponentData
-    {
-        public float MoveSpeedSource;
-        public float MoveSpeedResult;
-        public bool InMove;
-        public float MoveDistTemp;
-    }
+ 
 
-    public struct CreatureForward : IComponentData
+    public struct StatusForward : IComponentData
     {
         public float3 FaceForward;
         public float3 MoveForward;
@@ -87,22 +96,9 @@ namespace Dots
         public float Timer;
     }
 
-    //待处理事物
-    [InternalBufferCapacity(1)]
-    public struct CreatureDataProcess : IBufferElementData, IEnableableComponent
-    {
-        public ECreatureDataProcess Type;
-        public Entity EntityValue;
-        public float AddValue;
-        public float AddPercent;
-        public int IntValue1;
-        public int IntValue2;
-        public float FloatValue1;
-        public bool BoolValue;
-        public float3 Float3Value;
-    }
-
-    [InternalBufferCapacity(2)]
+    
+    
+    [InternalBufferCapacity(4)]
     public struct SkillEntities : IBufferElementData, IEnableableComponent
     {
         public Entity Value;
@@ -114,36 +110,10 @@ namespace Dots
         public Entity Value;
     }
 
-    [InternalBufferCapacity(2)]
+    [InternalBufferCapacity(4)]
     public struct SummonEntities : IBufferElementData
     {
         public Entity Value;
-    }
-
-    public struct MasterCreature : IComponentData
-    {
-        public Entity Value;
-    }
-
-    public enum ECreatureDataProcess
-    {
-        Cure,
-        AddCurHp,
-        ResetHp,
-        SetActive,
-        AddScale,
-        AddMaxHp,
-        KillEnemy,
-        AddShield,
-        RemoveShield,
-        SummonEntitiesDie,
-        ResetSummonsAroundAngle,
-        Teleport,
-        CastBulletAction,
-        Turn,
-        UnbindBullet,
-        SmallMonsterToElite,
-        AddAttr,
     }
 
     public struct CollisionDamageCdTag : IComponentData, IEnableableComponent
@@ -279,20 +249,20 @@ namespace Dots
         public bool HasEffect;
     }
 
-    public struct InRepelTag : IComponentData, IEnableableComponent
+    public struct InRepelState : IComponentData, IEnableableComponent
     {
         
     }
 
-    public struct InDeadTag : IComponentData, IEnableableComponent
+    public struct InDeadState : IComponentData, IEnableableComponent
     {
     }
 
-    public struct InFreezeTag : IComponentData, IEnableableComponent
+    public struct InFreezeState : IComponentData, IEnableableComponent
     {
     }
 
-    public struct InAttackTag : IComponentData, IEnableableComponent
+    public struct InAttackState : IComponentData, IEnableableComponent
     {
     }
 
@@ -320,32 +290,66 @@ namespace Dots
         public float Speed;
         public int EffectId;
     }
+ 
     
-    [InternalBufferCapacity(2)]
-    public struct DamageBuffer : IBufferElementData, IEnableableComponent
+   
+    [InternalBufferCapacity(4)]
+    public struct BindingBullet : IBufferElementData
     {
-        public Entity Bullet;
-        public float DamageFactor;
-        public bool FromExplosion;
-        
-        public float3 RepelForward;
-        public float RepelForce;
-        public float RepelTime;
-        public float RepelMaxScale;
-        public float RepelCd;
+        public Entity Value;
+        public EBulletFrom From;
+        public int FromId;
     }
     
-    [InternalBufferCapacity(4)]
-    public struct DamageNumberBuffer : IBufferElementData, IEnableableComponent
+    public enum EBulletFrom
     {
-        public float Value;
-        public EElement Element;
-        public EDamageNumber Type;
-        public EAgainstType Against;
-        public EElementReaction Reaction;
+        Default = 0,
+        Collision = 1,
+        Buff = 2,
+        ElementReaction = 3,
+        None = 100,
+    }
+    
+    public enum ECreatureDataProcess
+    {
+        Cure,
+        AddCurHp,
+        ResetHp,
+        SetActive,
+        AddScale,
+        AddMaxHp,
+        KillEnemy,
+        AddShield,
+        RemoveShield,
+        SummonEntitiesDie,
+        ResetSummonsAroundAngle,
+        Teleport,
+        CastBulletAction,
+        Turn,
+        UnbindBullet,
+        SmallMonsterToElite,
+        AddAttr,
+    }
+    
+    
+
+    //待处理事物
+    [InternalBufferCapacity(0)]
+    public struct CreatureDataProcess : IBufferElementData, IEnableableComponent
+    {
+        public ECreatureDataProcess Type;
+        public Entity EntityValue;
+        public float AddValue;
+        public float AddPercent;
+        public int IntValue1;
+        public int IntValue2;
+        public float FloatValue1;
+        public bool BoolValue;
+        public float3 Float3Value;
     }
 
-    [InternalBufferCapacity(1)]
+
+    [InternalBufferCapacity(0)]
     public struct ShootBulletBuffer : IBufferElementData, IEnableableComponent
     {
         public int BulletId;
@@ -375,21 +379,28 @@ namespace Dots
         public bool PlaySpellAni;
         public bool bUseWeaponSlots;
     }
-
-    [InternalBufferCapacity(2)]
-    public struct BindingBullet : IBufferElementData
+    
+    [InternalBufferCapacity(0)]
+    public struct DamageBuffer : IBufferElementData, IEnableableComponent
     {
-        public Entity Value;
-        public EBulletFrom From;
-        public int FromId;
+        public Entity Bullet;
+        public float DamageFactor;
+        public bool FromExplosion;
+        
+        public float3 RepelForward;
+        public float RepelForce;
+        public float RepelTime;
+        public float RepelMaxScale;
+        public float RepelCd;
     }
     
-    public enum EBulletFrom
+    [InternalBufferCapacity(0)]
+    public struct DamageNumberBuffer : IBufferElementData, IEnableableComponent
     {
-        Default = 0,
-        Collision = 1,
-        Buff = 2,
-        ElementReaction = 3,
-        None = 100,
+        public float Value;
+        public EElement Element;
+        public EDamageNumber Type;
+        public EAgainstType Against;
+        public EElementReaction Reaction;
     }
 }

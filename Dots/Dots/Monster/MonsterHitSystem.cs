@@ -12,11 +12,12 @@ namespace Dots
     [UpdateAfter(typeof(MonsterHatredSystem))]
     public partial struct MonsterHitSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<StatusColor> _colorLookup;
         [ReadOnly] private ComponentLookup<MaterialBlend> _blendLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
@@ -29,10 +30,11 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
                 
             _blendLookup = state.GetComponentLookup<MaterialBlend>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _colorLookup = state.GetComponentLookup<StatusColor>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
@@ -58,10 +60,11 @@ namespace Dots
             _blendLookup.Update(ref state);
             _attrLookup.Update(ref state);
             _attrModifyLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _hpLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             
             var ecb = new EntityCommandBuffer(Allocator.TempJob);
 
@@ -75,7 +78,8 @@ namespace Dots
                 BlendLookup = _blendLookup,
                 AttrLookup = _attrLookup,
                 AttrModifyLookup = _attrModifyLookup,
-                CreatureLookup = _creatureLookup,
+                HpLookup = _hpLookup,
+                SummonLookup = _summonLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
                 BuffTagLookup = _buffTagLookup,
                 BuffCommonLookup = _buffCommonLookup,
@@ -92,18 +96,22 @@ namespace Dots
             public EntityCommandBuffer.ParallelWriter Ecb;
             public Entity GlobalEntity;
            
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<StatusColor> ColorLookup;
             [ReadOnly] public ComponentLookup<MaterialBlend> BlendLookup;
             [ReadOnly] public ComponentLookup<PlayerAttrData> AttrLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusHp> HpLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
             [ReadOnly] public BufferLookup<PlayerAttrModify> AttrModifyLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
             
             [BurstCompile]
-            private void Execute(EnterHitTag _, RefRW<MonsterProperties> monster, MonsterTarget target, LocalTransform localTransform, Entity entity, [EntityIndexInQuery] int sortKey)
+            private void Execute(EnterHitTag _, RefRW<MonsterProperties> monster,
+                MonsterTarget target, LocalTransform localTransform, Entity entity,
+                CreatureTag creatureTag,
+                [EntityIndexInQuery] int sortKey)
             {
                 Ecb.SetComponentEnabled<EnterHitTag>(sortKey, entity, false);
 
@@ -111,20 +119,18 @@ namespace Dots
                 {
                     return;
                 }
-
-                if (!CreatureLookup.TryGetComponent(entity, out var creature))
-                {
-                    return;
-                }
                 
                 //如果是boss, 更新全局boss信息
-                if (creature.Type == ECreatureType.Boss)
+                if (creatureTag.Type == ECreatureType.Boss)
                 {
-                    Ecb.SetComponent(sortKey, GlobalEntity, new GlobalBossInfo
+                    if (HpLookup.TryGetComponent(entity, out var hpInfp))
                     {
-                        MonsterId = monster.ValueRO.Id,
-                        HpPercent = creature.CurHp / AttrHelper.GetMaxHp(entity, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup)
-                    });
+                        Ecb.SetComponent(sortKey, GlobalEntity, new GlobalBossInfo
+                        {
+                            MonsterId = monster.ValueRO.Id,
+                            HpPercent = hpInfp.CurHp / AttrHelper.GetMaxHp(entity, AttrLookup, AttrModifyLookup, HpLookup, SummonLookup , BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup)
+                        });
+                    }
                 }
 
                 //闪红

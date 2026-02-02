@@ -12,7 +12,6 @@ namespace Dots
     [UpdateInGroup(typeof(CreatureSystemGroup))]
     public partial struct CreatureDamageNumberSystem : ISystem
     {
-
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
@@ -59,19 +58,19 @@ namespace Dots
             public Entity Factory;
 
             [BurstCompile]
-            private void Execute(DynamicBuffer<DamageNumberBuffer> damageNumberBuffers,  RefRW<RandomSeed> random,
-                CreatureProperties creature, LocalTransform localTransform, Entity entity, [EntityIndexInQuery] int sortKey)
+            private void Execute(DynamicBuffer<DamageNumberBuffer> damageNumberBuffers, RefRW<RandomSeed> random,
+                StatusCenter statusCenter, LocalTransform localTransform, Entity entity, [EntityIndexInQuery] int sortKey)
             {
                 if (damageNumberBuffers.Length <= 0)
                 {
                     return;
                 }
-                
+
                 var buffer = damageNumberBuffers[0];
                 damageNumberBuffers.RemoveAt(0);
 
                 var rand = random.ValueRW.Value.NextFloat2(-0.5f, 0.5f);
-                var pos = CreatureHelper.getHeadPos(localTransform.Position, creature, localTransform.Scale) + new float3(rand.x, rand.y, 0);
+                var pos = CreatureHelper.GetHeadPos(localTransform.Position, statusCenter, localTransform.Scale) + new float3(rand.x, rand.y, 0);
 
                 var createBuffer = new DamageNumberCreateBuffer
                 {

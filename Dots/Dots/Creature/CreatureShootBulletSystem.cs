@@ -1,5 +1,3 @@
-using Dots;
-using Dots;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -14,7 +12,8 @@ namespace Dots
     [UpdateInGroup(typeof(CreatureSystemGroup))]
     public partial struct CreatureShootBulletSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusCenter> _centerLookup;
+        [ReadOnly] private ComponentLookup<CreatureProps> _propsLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
@@ -26,7 +25,8 @@ namespace Dots
         {
             state.RequireForUpdate<GlobalInitialized>();
 
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _centerLookup = state.GetComponentLookup<StatusCenter>(true);
+            _propsLookup = state.GetComponentLookup<CreatureProps>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
@@ -49,7 +49,8 @@ namespace Dots
                 return;
             }
             
-            _creatureLookup.Update(ref state);
+            _centerLookup.Update(ref state);
+            _propsLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
@@ -65,7 +66,8 @@ namespace Dots
                 DeltaTime = deltaTime,
                 Factory = global.Entity,
                 Ecb = ecb.AsParallelWriter(),
-                CreatureLookup = _creatureLookup,
+                CenterLookup = _centerLookup,
+                PropsLookup = _propsLookup,
                 BuffCommonLookup = _buffCommonLookup,
                 BuffTagLookup = _buffTagLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
@@ -86,7 +88,9 @@ namespace Dots
             public EntityCommandBuffer.ParallelWriter Ecb;
             public Entity Factory;
             
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusCenter> CenterLookup;
+            [ReadOnly] public ComponentLookup<CreatureProps> PropsLookup;
+            
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
@@ -96,11 +100,6 @@ namespace Dots
             [BurstCompile]
             private void Execute(DynamicBuffer<ShootBulletBuffer> skillShootBuffer, LocalTransform localTransform, RefRW<RandomSeed> random, Entity entity, [EntityIndexInQuery] int sortKey)
             {
-                if (!CreatureLookup.TryGetComponent(entity, out var creature))
-                {
-                    return;
-                }
-                
                 //判断结束时间
                 for (var i = skillShootBuffer.Length - 1; i >= 0; i--)
                 {
@@ -199,6 +198,12 @@ namespace Dots
                                     if (buffer.AlreadyShootCount <= 0)
                                     {
                                         var muzzleScale = buffer.MuzzleScale <= 0f ? 1f : buffer.MuzzleScale;
+                                        var muzzlePos = centerPos;
+                                        if (CenterLookup.TryGetComponent(entity, out var center))
+                                        {
+                                            muzzlePos = CreatureHelper.GetCenterPos(centerPos, center, localTransform.Scale);
+                                        }
+                                        
                                         var laserEffectBuffer = new EffectCreateBuffer
                                         {
                                             From = EEffectFrom.Muzzle,
@@ -216,7 +221,7 @@ namespace Dots
                                                 Enable = buffer.RotateSpeed != 0,
                                                 Speed = buffer.RotateSpeed,
                                                 Radius = 0,
-                                                CenterPos = CreatureHelper.getCenterPos(centerPos, creature, localTransform.Scale),
+                                                CenterPos = muzzlePos,
                                                 UseAtkRange = true,
                                                 SourceScale = muzzleScale,
                                                 MasterCreature = entity,
@@ -249,19 +254,23 @@ namespace Dots
                                     Ecb.AppendToBuffer(sortKey, Factory, laserEffectBuffer);
                                 }
                             }
-                            
-                            var bulletBuffer = new BulletCreateBuffer
+
+                            if (PropsLookup.TryGetComponent(entity, out var creatureProp))
                             {
-                                BulletId = buffer.BulletId,
-                                ParentCreature = entity,
-                                AtkValue = new AtkValue(creature.AtkValue.Atk, creature.AtkValue.Crit, creature.AtkValue.CritDamage, creature.AtkValue.Team),
-                                Direction = dir,
-                                ShootPos = shootPos,
-                                SkillEntity = buffer.SkillEntity,
-                                DisableSplit = buffer.DisableSplit,
-                                Offset = buffer.Offset,
-                            };
-                            Ecb.AppendToBuffer(sortKey, Factory, bulletBuffer);
+                                var bulletBuffer = new BulletCreateBuffer
+                                {
+                                    BulletId = buffer.BulletId,
+                                    ParentCreature = entity,
+                                    AtkValue = new AtkValue(creatureProp.AtkValue.Atk, creatureProp.AtkValue.Crit, creatureProp.AtkValue.CritDamage, creatureProp.AtkValue.Team),
+                                    Direction = dir,
+                                    ShootPos = shootPos,
+                                    SkillEntity = buffer.SkillEntity,
+                                    DisableSplit = buffer.DisableSplit,
+                                    Offset = buffer.Offset,
+                                };
+                                Ecb.AppendToBuffer(sortKey, Factory, bulletBuffer);
+                            }
+                           
 
                             buffer.ShootTimer = buffer.ShootInterval;
                             buffer.AlreadyShootCount += 1;

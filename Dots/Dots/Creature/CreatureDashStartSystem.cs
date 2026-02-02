@@ -1,5 +1,3 @@
-using Dots;
-using Dots;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -14,9 +12,9 @@ namespace Dots
     [UpdateInGroup(typeof(CreatureSystemGroup))]
     public partial struct CreatureDashStartSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<InDashingTag> _inDashLookup;
-        [ReadOnly] private ComponentLookup<CreatureForward> _forwardLookup;
+        [ReadOnly] private ComponentLookup<StatusForward> _forwardLookup;
         [ReadOnly] private ComponentLookup<PhysicsMass> _physicsMassLookup;
         [ReadOnly] private ComponentLookup<PhysicsVelocity> _velocityLookup;
 
@@ -26,9 +24,9 @@ namespace Dots
             state.RequireForUpdate<GlobalInitialized>();
             state.RequireForUpdate<CacheProperties>();
             
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _inDashLookup = state.GetComponentLookup<InDashingTag>(true);
-            _forwardLookup = state.GetComponentLookup<CreatureForward>(true);
+            _forwardLookup = state.GetComponentLookup<StatusForward>(true);
             _physicsMassLookup = state.GetComponentLookup<PhysicsMass>();
             _velocityLookup = state.GetComponentLookup<PhysicsVelocity>();
         }
@@ -57,7 +55,7 @@ namespace Dots
             var cache = SystemAPI.GetAspect<CacheAspect>(SystemAPI.GetSingletonEntity<CacheProperties>());
 
             foreach (var (tag, localTransform, creature, entity) 
-                     in SystemAPI.Query<DashStartTag, RefRW<LocalTransform>, RefRW<CreatureProperties>>().WithEntityAccess())
+                     in SystemAPI.Query<DashStartTag, RefRW<LocalTransform>, RefRW<CreatureTag>>().WithEntityAccess())
             {
                 ecb.SetComponentEnabled<DashStartTag>(entity, false);
                 

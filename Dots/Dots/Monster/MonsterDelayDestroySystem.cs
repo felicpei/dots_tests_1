@@ -11,14 +11,14 @@ namespace Dots
     [UpdateAfter(typeof(MonsterMoveSystem))]
     public partial struct MonsterDelayDestroySystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<EnterDieTag> _enterDieLookup;
 
         [BurstCompile] 
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<GlobalInitialized>();
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _enterDieLookup = state.GetComponentLookup<EnterDieTag>(true);
         }
 
@@ -62,7 +62,7 @@ namespace Dots
         {
             public float DeltaTime;
             public EntityCommandBuffer.ParallelWriter Ecb;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<EnterDieTag> EnterDieLookup;
 
             [BurstCompile]

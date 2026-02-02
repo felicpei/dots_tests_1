@@ -13,8 +13,11 @@ namespace Dots
     [UpdateInGroup(typeof(SkillSystemGroup))]
     public partial struct SkillTriggerSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
-        [ReadOnly] private ComponentLookup<MonsterProperties> _monsterLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
+        [ReadOnly] private ComponentLookup<StatusMove> _moveLookup;
+        [ReadOnly] private ComponentLookup<CreatureTag> _creatureTagLookup;
+
         [ReadOnly] private ComponentLookup<MonsterTarget> _monsterTargetLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _transformLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
@@ -37,8 +40,10 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
 
             _transformLookup = state.GetComponentLookup<LocalToWorld>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
-            _monsterLookup = state.GetComponentLookup<MonsterProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
+            _moveLookup = state.GetComponentLookup<StatusMove>(true);
+            _creatureTagLookup = state.GetComponentLookup<CreatureTag>(true);
             _monsterTargetLookup = state.GetComponentLookup<MonsterTarget>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
@@ -67,12 +72,14 @@ namespace Dots
                 return;
             }
 
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _hpLookup.Update(ref state);
+            _moveLookup.Update(ref state);
+            _creatureTagLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
             _transformLookup.Update(ref state);
-            _monsterLookup.Update(ref state);
             _monsterTargetLookup.Update(ref state);
             _cacheLookup.Update(ref state);
             _inBornLookup.Update(ref state);
@@ -95,8 +102,11 @@ namespace Dots
                 CurrTime = currTime,
                 GlobalEntity = global.Entity,
                 Ecb = ecb.AsParallelWriter(),
-                CreatureLookup = _creatureLookup,
-                MonsterLookup = _monsterLookup,
+                SummonLookup = _summonLookup,
+
+                MoveLookup = _moveLookup,
+                HpLookup = _hpLookup,
+                CreatureTagLookup = _creatureTagLookup,
                 MonsterTargetLookup = _monsterTargetLookup,
                 TransformLookup = _transformLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
@@ -128,8 +138,11 @@ namespace Dots
             public float CurrTime;
             public Entity GlobalEntity;
             public EntityCommandBuffer.ParallelWriter Ecb;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
-            [ReadOnly] public ComponentLookup<MonsterProperties> MonsterLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
+            [ReadOnly] public ComponentLookup<StatusMove> MoveLookup;
+            [ReadOnly] public ComponentLookup<StatusHp> HpLookup;
+            [ReadOnly] public ComponentLookup<CreatureTag> CreatureTagLookup;
+
             [ReadOnly] public ComponentLookup<MonsterTarget> MonsterTargetLookup;
             [ReadOnly] public ComponentLookup<LocalToWorld> TransformLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
@@ -154,14 +167,12 @@ namespace Dots
                     return;
                 }
 
-                if (!CreatureLookup.TryGetComponent(master.Value, out var masterCreature))
+                if (CreatureTagLookup.TryGetComponent(master.Value, out var masterTag))
                 {
-                    return;
-                }
-
-                if (InMonsterPause && masterCreature.AtkValue.Team == ETeamId.Monster)
-                {
-                    return;
+                    if (InMonsterPause && masterTag.TeamId == ETeamId.Monster)
+                    {
+                        return;
+                    }
                 }
 
                 if (InBornLookup.HasComponent(master.Value) && InBornLookup.IsComponentEnabled(master.Value))
@@ -225,10 +236,13 @@ namespace Dots
                             var bValid = false;
                             if (hpLessPercent > 0)
                             {
-                                var curPercent = masterCreature.CurHp / AttrHelper.GetMaxHp(master.Value, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
-                                if (curPercent <= hpLessPercent)
+                                if (HpLookup.TryGetComponent(master.Value, out var masterHp))
                                 {
-                                    bValid = true;
+                                    var curPercent = masterHp.CurHp / AttrHelper.GetMaxHp(master.Value, AttrLookup, AttrModifyLookup, HpLookup, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                                    if (curPercent <= hpLessPercent)
+                                    {
+                                        bValid = true;
+                                    }
                                 }
                             }
                             else
@@ -275,10 +289,15 @@ namespace Dots
                                 Debug.LogError($"技能配置錯誤, Trigger IntervalMoveState 配置的 CD(param1) == 0, skillId:{config.Id}");
                             }
 
-                            var skillCd = SkillHelper.CalcSkillCd(cd, config, master.Value, CreatureLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                            if (!MoveLookup.TryGetComponent(master.Value, out var masterMove))
+                            {
+                                break;
+                            }
+
+                            var skillCd = SkillHelper.CalcSkillCd(cd, config, master.Value, SummonLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                             if (needMove)
                             {
-                                if (masterCreature.InMoveCopy)
+                                if (masterMove.InMove)
                                 {
                                     properties.ValueRW.CdTimer = properties.ValueRO.CdTimer + DeltaTime;
                                 }
@@ -289,7 +308,7 @@ namespace Dots
                             }
                             else
                             {
-                                if (!masterCreature.InMoveCopy)
+                                if (!masterMove.InMove)
                                 {
                                     properties.ValueRW.CdTimer = properties.ValueRO.CdTimer + DeltaTime;
                                 }
@@ -337,7 +356,7 @@ namespace Dots
 
                                 if (properties.ValueRO.CdTimer <= 0)
                                 {
-                                    var skillCd = SkillHelper.CalcSkillCd(cd, config, master.Value, CreatureLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                                    var skillCd = SkillHelper.CalcSkillCd(cd, config, master.Value, SummonLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                                     properties.ValueRW.CdTimer = skillCd;
                                     properties.ValueRW.PlayedAtk = false;
 
@@ -420,11 +439,11 @@ namespace Dots
                             }
 
                             //subCount buff
-                            var addValue = BuffHelper.GetBuffAddValue(master.Value, CreatureLookup,
+                            var addValue = BuffHelper.GetBuffAddValue(master.Value, SummonLookup,
                                 BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillIntervalDualCastCount, config.ClassId, config.Id);
 
                             //attr shoot count
-                            var attrAddValue = AttrHelper.GetAttr(master.Value, EAttr.ShootCount, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                            var attrAddValue = AttrHelper.GetAttr(master.Value, EAttr.ShootCount, AttrLookup, AttrModifyLookup, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                             var maxAttrAdd = AttrHelper.GetMax(EAttr.ShootCount, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                             if (attrAddValue > maxAttrAdd)
                             {
@@ -500,7 +519,7 @@ namespace Dots
                                     properties.ValueRW.CdTimer = properties.ValueRO.CdTimer - DeltaTime;
                                     if (properties.ValueRO.CdTimer <= 0)
                                     {
-                                        var mainCdTime = SkillHelper.CalcSkillCd(mainCD, config, master.Value, CreatureLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                                        var mainCdTime = SkillHelper.CalcSkillCd(mainCD, config, master.Value, SummonLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                                         properties.ValueRW.CdTimer = mainCdTime;
 
                                         if (playAniSpellInSub)
@@ -621,10 +640,10 @@ namespace Dots
                                                 properties.ValueRW.CountFlag = dist;
 
                                                 //计算概率是否释放
-                                                if (CalcCountAndProb(properties, random, 0, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                                if (CalcCountAndProb(properties, random, 0, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                                 {
                                                     //计算CD
-                                                    var cdTime = SkillHelper.CalcSkillCd(cd, config, master.Value, CreatureLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                                                    var cdTime = SkillHelper.CalcSkillCd(cd, config, master.Value, SummonLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                                                     properties.ValueRW.CdTimer = cdTime;
 
                                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
@@ -650,7 +669,7 @@ namespace Dots
                             {
                                 if (data.Type == ESkillTrigger.OnHit)
                                 {
-                                    if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                    if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                     {
                                         Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags
                                         {
@@ -705,7 +724,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, 0, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, 0, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags
                                     {
@@ -766,7 +785,7 @@ namespace Dots
 
                                 if (bExistTypeCheck)
                                 {
-                                    if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                    if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                     {
                                         //记录子弹ID
                                         properties.ValueRW.SavedBulletId = buffer.IntValue1;
@@ -845,7 +864,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags
                                     {
@@ -943,7 +962,7 @@ namespace Dots
 
                                 if (bBulletCheck && bBuffCheck)
                                 {
-                                    if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                    if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                     {
                                         Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags
                                         {
@@ -984,7 +1003,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, 0, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, 0, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags { CastDelay = delay, CreateTime = CurrTime });
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1035,7 +1054,7 @@ namespace Dots
                                     Target = buffer.Entity,
                                 };
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags { CastDelay = delay, CreateTime = CurrTime });
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1139,7 +1158,7 @@ namespace Dots
 
                                     //看是否达到percent要求
                                     var lostPercent = 0f;
-                                    var maxHp = AttrHelper.GetMaxHp(master.Value, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                                    var maxHp = AttrHelper.GetMaxHp(master.Value, AttrLookup, AttrModifyLookup, HpLookup, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                                     if (maxHp > 0)
                                     {
                                         lostPercent = properties.ValueRO.CountFlag / maxHp;
@@ -1149,7 +1168,7 @@ namespace Dots
                                     {
                                         properties.ValueRW.CountFlag = 0;
 
-                                        var probFactor = BuffHelper.GetBuffAddFactor(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillTriggerProb, config.ClassId, config.Id);
+                                        var probFactor = BuffHelper.GetBuffAddFactor(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillTriggerProb, config.ClassId, config.Id);
                                         prob += probFactor;
 
                                         if (random.ValueRW.Value.NextFloat(0f, 1f) < prob)
@@ -1176,7 +1195,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, 0, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, 0, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1198,7 +1217,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, 0, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, 0, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1221,7 +1240,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1244,7 +1263,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1267,7 +1286,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1294,7 +1313,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1322,7 +1341,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1346,7 +1365,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1374,7 +1393,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, 0, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, 0, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1403,7 +1422,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1432,7 +1451,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1455,7 +1474,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, 0, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, 0, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1488,7 +1507,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, 0, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, 0, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags
                                     {
@@ -1530,7 +1549,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags
                                     {
@@ -1575,7 +1594,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags
                                     {
@@ -1621,7 +1640,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags
                                     {
@@ -1648,7 +1667,7 @@ namespace Dots
                                     continue;
                                 }
 
-                                if (CalcCountAndProb(properties, random, needCount, prob, CreatureLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
+                                if (CalcCountAndProb(properties, random, needCount, prob, SummonLookup, config, master.Value, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup))
                                 {
                                     Ecb.AppendToBuffer(sortKey, entity, new SkillTargetTags());
                                     Ecb.SetComponentEnabled<SkillTargetTags>(sortKey, entity, true);
@@ -1757,15 +1776,18 @@ namespace Dots
                 triggerBuffers.Clear();
             }
 
-            private static bool CalcCountAndProb(RefRW<SkillProperties> properties, RefRW<RandomSeed> random, int needCount, float prob, ComponentLookup<CreatureProperties> creatureLookup, SkillConfig config, Entity master,
-                BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
+            private static bool CalcCountAndProb(RefRW<SkillProperties> properties, RefRW<RandomSeed> random, int needCount, float prob,
+                ComponentLookup<StatusSummon> summonLookup, SkillConfig config, Entity master,
+                BufferLookup<BuffEntities> buffEntitiesLookup,
+                ComponentLookup<BuffTag> buffTagLookup,
+                ComponentLookup<BuffCommonData> buffCommonLookup)
             {
                 properties.ValueRW.CountFlag = properties.ValueRO.CountFlag + 1;
                 if (properties.ValueRO.CountFlag >= needCount)
                 {
                     properties.ValueRW.CountFlag = 0;
 
-                    var probFactor = BuffHelper.GetBuffAddFactor(master, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.SkillTriggerProb, config.ClassId, config.Id);
+                    var probFactor = BuffHelper.GetBuffAddFactor(master, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.SkillTriggerProb, config.ClassId, config.Id);
                     prob += probFactor;
 
                     if (random.ValueRW.Value.NextFloat(0f, 1f) < prob)

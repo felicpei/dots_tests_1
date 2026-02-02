@@ -10,7 +10,7 @@ namespace Dots
     [UpdateInGroup(typeof(MonsterSystemGroup))]
     public partial struct MonsterBornSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureForward> _creatureForwardLookup;
+        [ReadOnly] private ComponentLookup<StatusForward> _creatureForwardLookup;
         [ReadOnly] private ComponentLookup<HybridEvent_SetActive> _eventSetActive;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
         [ReadOnly] private BufferLookup<BindingBullet> _bindBulletLookup;
@@ -23,7 +23,7 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
             
             _eventSetActive = state.GetComponentLookup<HybridEvent_SetActive>(true);
-            _creatureForwardLookup = state.GetComponentLookup<CreatureForward>(true);
+            _creatureForwardLookup = state.GetComponentLookup<StatusForward>(true);
             _bindBulletLookup = state.GetBufferLookup<BindingBullet>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
         }
@@ -52,7 +52,8 @@ namespace Dots
             var cache = SystemAPI.GetAspect<CacheAspect>(SystemAPI.GetSingletonEntity<CacheProperties>());
             var localPlayer = SystemAPI.GetSingletonEntity<LocalPlayerTag>();
             
-            foreach (var (tag, monster, creature, entity) in SystemAPI.Query<RefRW<InBornTag>, MonsterProperties, RefRW<CreatureProperties>>().WithEntityAccess())
+            foreach (var (tag, monster, creature, creatureProps, entity) in 
+                     SystemAPI.Query<RefRW<InBornTag>, MonsterProperties, RefRW<CreatureTag>, CreatureProps>().WithEntityAccess())
             {
                 if (!cache.GetMonsterConfig(monster.Id, out var monsterConfig))
                 {
@@ -73,7 +74,7 @@ namespace Dots
                     //绑定子弹
                     if (monsterConfig.BindBulletId > 0)
                     {
-                        BulletHelper.BindCollisionBullet(global, entity, creature.ValueRO, _bindBulletLookup, _transformLookup, monsterConfig.BindBulletId);
+                        BulletHelper.BindCollisionBullet(global, entity, creatureProps, _bindBulletLookup, _transformLookup, monsterConfig.BindBulletId);
                     }
                 }
             }

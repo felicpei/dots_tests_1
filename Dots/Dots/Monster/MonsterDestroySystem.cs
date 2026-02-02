@@ -1,5 +1,3 @@
-using Dots;
-using Dots;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -81,7 +79,7 @@ namespace Dots
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             
             [BurstCompile]
-            private void Execute(RefRW<MonsterDestroyTag> tag, MonsterProperties _, InDeadTag inDeadTag, Entity entity, [EntityIndexInQuery] int sortKey)
+            private void Execute(RefRW<MonsterDestroyTag> tag, MonsterProperties _, InDeadState inDeadState, Entity entity, [EntityIndexInQuery] int sortKey)
             {
                 tag.ValueRW.Timer = tag.ValueRO.Timer + DeltaTime;
 

@@ -14,7 +14,7 @@ namespace Dots
     public partial struct CreatureRepelStartSystem : ISystem
     {
         private EntityQuery _query;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<InDashingTag> _dashLookup;
         [ReadOnly] private ComponentLookup<CreatureRepelCd> _repelCdLookup;
 
@@ -27,7 +27,7 @@ namespace Dots
             _query = state.GetEntityQuery(queryBuilder);
             queryBuilder.Dispose();
 
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _dashLookup = state.GetComponentLookup<InDashingTag>(true);
             _repelCdLookup = state.GetComponentLookup<CreatureRepelCd>(true);
         }
@@ -77,11 +77,11 @@ namespace Dots
         {
             public EntityCommandBuffer.ParallelWriter Ecb;
             [ReadOnly] public ComponentLookup<InDashingTag> InDashLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> InDeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> InDeadLookup;
             [ReadOnly] public ComponentLookup<CreatureRepelCd> RepelCdLookup;
 
             [BurstCompile]
-            private void Execute(CreatureRepelStart tag, RefRW<PhysicsVelocity> velocity, CreatureProperties creature, LocalTransform localTransform, PhysicsMass mass, Entity entity, [EntityIndexInQuery] int sortKey)
+            private void Execute(CreatureRepelStart tag, RefRW<PhysicsVelocity> velocity, CreatureProps props, LocalTransform localTransform, PhysicsMass mass, Entity entity, [EntityIndexInQuery] int sortKey)
             {
                 Ecb.SetComponentEnabled<CreatureRepelStart>(sortKey, entity, false);
 
@@ -131,7 +131,7 @@ namespace Dots
                 }
 
                 //如果配置了CD，记录CD
-                var repelCd = tag.RepelCd > 0 ? tag.RepelCd : creature.RepelCd;
+                var repelCd = tag.RepelCd > 0 ? tag.RepelCd : props.RepelCd;
                 if (repelCd > 0)
                 {
                     Ecb.SetComponent(sortKey, entity, new CreatureRepelCd { Timer = repelCd });

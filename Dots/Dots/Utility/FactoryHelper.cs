@@ -20,33 +20,6 @@ namespace Dots
 
     public static class FactoryHelper
     {
-        public static uint GetRandomUid(RefRW<RandomSeed> random)
-        {
-            return random.ValueRW.Value.NextUInt(uint.MinValue, uint.MaxValue);
-        }
-
-        public static Entity FindSummonRoot(Entity entity, EntityManager entityManager)
-        {
-            while (true)
-            {
-                var bFind = false;
-                if (entityManager.HasComponent<CreatureProperties>(entity))
-                {
-                    var creature = entityManager.GetComponentData<CreatureProperties>(entity);
-                    if (entityManager.HasComponent<CreatureProperties>(creature.SummonParent))
-                    {
-                        entity = creature.SummonParent;
-                        bFind = true;
-                    }
-                }
-
-                if (!bFind)
-                {
-                    return entity;
-                }
-            }
-        }
-
         public static Entity InstantiateEntity(Entity prefab, EntityCommandBuffer ecb)
         {
             var entity = ecb.Instantiate(prefab);
@@ -825,8 +798,13 @@ namespace Dots
         }
 
         //添加buff
-        public static void CreateBuff(Entity entityCreature, CreateBuffData data, GlobalAspect global, CacheAspect cache, ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<LocalTransform> transformLookup,
-            BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup, EntityCommandBuffer ecb)
+        public static void CreateBuff(Entity entityCreature, CreateBuffData data, GlobalAspect global, CacheAspect cache,
+            ComponentLookup<StatusSummon> summonLookup, 
+            ComponentLookup<LocalTransform> transformLookup,
+            BufferLookup<BuffEntities> buffEntitiesLookup, 
+            ComponentLookup<BuffTag> buffTagLookup, 
+            ComponentLookup<BuffCommonData> buffCommonLookup, 
+            EntityCommandBuffer ecb)
         {
             if (!transformLookup.TryGetComponent(entityCreature, out var masterTrans))
             {
@@ -856,17 +834,17 @@ namespace Dots
             }
 
             var contTime = data.ContTime == 0f ? buffConfig.Duration : data.ContTime;
-            contTime = BuffHelper.CalcContTime(contTime, data.Attacker, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+            contTime = BuffHelper.CalcContTime(contTime, data.Attacker, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
 
             //看是否增加、减少debuff时间
             {
-                var addFactor = BuffHelper.GetBuffAddFactor(entityCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.DebuffTime, (int)buffConfig.BuffType);
+                var addFactor = BuffHelper.GetBuffAddFactor(entityCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.DebuffTime, (int)buffConfig.BuffType);
                 contTime = BuffHelper.CalcFactor(contTime, addFactor);
             }
 
             //时间增加的buff
             {
-                var addFactor = BuffHelper.GetBuffAddFactor(data.Attacker, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.AttackerBuffTime, (int)buffConfig.BuffType);
+                var addFactor = BuffHelper.GetBuffAddFactor(data.Attacker, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.AttackerBuffTime, (int)buffConfig.BuffType);
                 contTime = BuffHelper.CalcFactor(contTime, addFactor);
             }
 
@@ -927,7 +905,8 @@ namespace Dots
 
 
         //创建子弹
-        public static void CreateBullet(GlobalAspect global, CacheAspect cache, BulletCreateBuffer buffer, EntityCommandBuffer ecb, ComponentLookup<LocalTransform> transformLookup, ComponentLookup<CreatureProperties> creatureLookup,
+        public static void CreateBullet(GlobalAspect global, CacheAspect cache, BulletCreateBuffer buffer,
+            EntityCommandBuffer ecb, ComponentLookup<LocalTransform> transformLookup, ComponentLookup<StatusSummon> summonLookup,
             ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             BufferLookup<SkillEntities> skillEntitiesLookup, ComponentLookup<SkillTag> skillTagLookup)
@@ -957,7 +936,7 @@ namespace Dots
 
             //查看buff是否替换子弹ID
             {
-                var attachList = BuffHelper.GetBuffAttachInt(buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.ReplaceBullet, bulletConfig.Id, bulletConfig.ClassId);
+                var attachList = BuffHelper.GetBuffAttachInt(buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.ReplaceBullet, bulletConfig.Id, bulletConfig.ClassId);
                 if (attachList.Length > 0)
                 {
                     var newBulletId = attachList[global.Random.ValueRW.Value.NextInt(0, attachList.Length)];
@@ -990,7 +969,7 @@ namespace Dots
 
             //检查是否同故宫buff替换CollisionType
             {
-                var newCollisionTypes = BuffHelper.GetBuffAttachInt(buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletChangeCollisionType, bulletConfig.Id, bulletConfig.ClassId);
+                var newCollisionTypes = BuffHelper.GetBuffAttachInt(buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletChangeCollisionType, bulletConfig.Id, bulletConfig.ClassId);
                 if (newCollisionTypes.Length > 0)
                 {
                     collisionType = (ECollisionBulletType)newCollisionTypes[0];
@@ -1017,7 +996,7 @@ namespace Dots
             }
 
             //获得速度
-            var velocity = BulletHelper.CalcBulletVelocity(buffer.ParentCreature, bulletConfig, creatureLookup, attrLookup, attrModifyLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, out var acceleration);
+            var velocity = BulletHelper.CalcBulletVelocity(buffer.ParentCreature, bulletConfig, summonLookup, attrLookup, attrModifyLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, out var acceleration);
             if (buffer.SpeedFactor > 0)
             {
                 velocity *= buffer.SpeedFactor;
@@ -1038,11 +1017,11 @@ namespace Dots
             else
             {
                 contTime = bulletConfig.ContTime;
-                contTime = BuffHelper.CalcContTime(contTime, buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+                contTime = BuffHelper.CalcContTime(contTime, buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
 
                 //buff bulletDist 影响
                 {
-                    var addFactor = BuffHelper.GetBuffAddFactor(buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletContTime, bulletConfig.Id);
+                    var addFactor = BuffHelper.GetBuffAddFactor(buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletContTime, bulletConfig.Id);
                     contTime = BuffHelper.CalcFactor(contTime, addFactor);
                 }
 
@@ -1056,7 +1035,7 @@ namespace Dots
             var maxBounceCount = bulletConfig.BounceCount;
             if (maxBounceCount != -1 && !buffer.DisableBounce)
             {
-                var addValue = BuffHelper.GetBuffAddValue(buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletBounce, bulletConfig.Id, bulletConfig.ClassId);
+                var addValue = BuffHelper.GetBuffAddValue(buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletBounce, bulletConfig.Id, bulletConfig.ClassId);
                 maxBounceCount += (int)addValue;
             }
 
@@ -1064,7 +1043,7 @@ namespace Dots
             var maxDamageCount = bulletConfig.DamageCount;
             if (maxDamageCount > 0)
             {
-                var addValue = BuffHelper.GetBuffAddValue(buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletDamageCount, bulletConfig.Id, bulletConfig.ClassId);
+                var addValue = BuffHelper.GetBuffAddValue(buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletDamageCount, bulletConfig.Id, bulletConfig.ClassId);
                 maxDamageCount += (int)addValue;
             }
 
@@ -1075,10 +1054,10 @@ namespace Dots
                 var horizCount = bulletConfig.HorizCount <= 0 ? 1 : bulletConfig.HorizCount;
                 var horizDist = bulletConfig.HorizDist;
 
-                BulletHelper.CalcSplitInfo(bulletConfig, buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, out var splitCount, out var splitAngle);
+                BulletHelper.CalcSplitInfo(bulletConfig, buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, out var splitCount, out var splitAngle);
 
                 //横向分裂buff
-                var horizResult = BuffHelper.GetBuffFactorAndValue(buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletSplitHoriz, bulletConfig.Id, bulletConfig.ClassId);
+                var horizResult = BuffHelper.GetBuffFactorAndValue(buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletSplitHoriz, bulletConfig.Id, bulletConfig.ClassId);
                 if (horizResult.AddValue > 0 || horizResult.AddFactor > 0)
                 {
                     horizCount += (int)horizResult.AddValue;
@@ -1106,17 +1085,17 @@ namespace Dots
             //计算爆炸范围
             var sourceRadius = buffer.BombRadius > 0 ? buffer.BombRadius : bulletConfig.BombRadius;
             var bombRadius = BulletHelper.CalcBulletBombRadius(sourceRadius, bulletConfig, buffer.ParentCreature, buffer.ImmediatelyBomb, buffer.ForceHitCreature,
-                creatureLookup, attrLookup, attrModifyLookup, transformLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+                summonLookup, attrLookup, attrModifyLookup, transformLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
 
             //技能配置：向前偏移量
             var bornPos = buffer.ShootPos;
 
             //环绕半径
-            var damageRangeFactor = AttrHelper.GetDamageRangeFactor(buffer.ParentCreature, creatureLookup, attrLookup, attrModifyLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, true);
+            var damageRangeFactor = AttrHelper.GetDamageRangeFactor(buffer.ParentCreature, summonLookup, attrLookup, attrModifyLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, true);
             var radiusX = BuffHelper.CalcFactor(buffer.AroundRadiusX, damageRangeFactor);
             var radiusY = BuffHelper.CalcFactor(buffer.AroundRadiusY, damageRangeFactor);
             var aroundEnable = transformLookup.HasComponent(buffer.AroundEntity) || MathHelper.IsValid(buffer.AroundPos);
-            var bTrace = creatureLookup.HasComponent(buffer.TraceCreature);
+            var bTrace = summonLookup.HasComponent(buffer.TraceCreature);
 
             ecb.AddComponent(bulletEntity, new BulletAtkValue
             {
@@ -1181,13 +1160,13 @@ namespace Dots
 
             //bullet behaviour 相关数据
             {
-                var addBehaviours = BuffHelper.GetBuffAttachInt(buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.AddBulletBehaviour, bulletConfig.Id, bulletConfig.ClassId);
+                var addBehaviours = BuffHelper.GetBuffAttachInt(buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.AddBulletBehaviour, bulletConfig.Id, bulletConfig.ClassId);
 
                 //加配置表的id
                 if (bulletConfig.Behaviour > 0)
                 {
                     var behaviourId = bulletConfig.Behaviour;
-                    var changeBehaviours = BuffHelper.GetBuffAttachInt(buffer.ParentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.ChangeBulletBehaviour, bulletConfig.Id, bulletConfig.ClassId, behaviourId);
+                    var changeBehaviours = BuffHelper.GetBuffAttachInt(buffer.ParentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.ChangeBulletBehaviour, bulletConfig.Id, bulletConfig.ClassId, behaviourId);
 
                     for (var i = 0; i < changeBehaviours.Length; i++)
                     {
@@ -1360,7 +1339,9 @@ namespace Dots
 
 
         //创建特效 
-        public static void CreateEffects(GlobalAspect global, CacheAspect cache, EffectCreateBuffer buffer, EntityCommandBuffer ecb, ComponentLookup<LocalTransform> transformLookup, ComponentLookup<CreatureProperties> creatureLookup)
+        public static void CreateEffects(GlobalAspect global, CacheAspect cache, 
+            EffectCreateBuffer buffer, EntityCommandBuffer ecb,
+            ComponentLookup<LocalTransform> transformLookup, ComponentLookup<StatusCenter> centerLookup)
         {
             if (!cache.GetResourceConfig(buffer.ResourceId, out var resConfig))
             {
@@ -1407,7 +1388,7 @@ namespace Dots
                 }
                 else
                 {
-                    if (creatureLookup.TryGetComponent(buffer.Parent, out var creature))
+                    if (centerLookup.TryGetComponent(buffer.Parent, out var creature))
                     {
                         //使用中心坐标点
                         pos = float3.zero;
@@ -1490,14 +1471,10 @@ namespace Dots
         }
 
         public static void CreateProgressBar(CacheAspect cache, GlobalAspect global, ProgressBarCreateBuffer buffer, EntityCommandBuffer ecb,
-            ComponentLookup<LocalTransform> transformLookup, ComponentLookup<InDeadTag> deadLookup, ComponentLookup<CreatureProperties> creatureLookup)
+            ComponentLookup<LocalTransform> transformLookup, ComponentLookup<InDeadState> deadLookup,
+            ComponentLookup<StatusCenter> centerLookup)
         {
             if (!transformLookup.TryGetComponent(buffer.Parent, out var parentTransform))
-            {
-                return;
-            }
-
-            if (!creatureLookup.TryGetComponent(buffer.Parent, out var creature))
             {
                 return;
             }
@@ -1514,12 +1491,17 @@ namespace Dots
             }
 
             var entity = InstantiateEntity(global.Empty, ecb);
+            var pos = buffer.StartPos;
+            if (centerLookup.TryGetComponent(buffer.Parent, out var creature))
+            {
+                pos = CreatureHelper.GetHeadPos(buffer.StartPos, creature, parentTransform.Scale);
+            }
 
             ecb.SetComponent(entity, new LocalTransform
             {
                 Scale = parentTransform.Scale,
                 Rotation = quaternion.identity,
-                Position = CreatureHelper.getHeadPos(buffer.StartPos, creature, parentTransform.Scale),
+                Position = pos,
             });
 
             ecb.AddComponent(entity, new MaterialFillRate

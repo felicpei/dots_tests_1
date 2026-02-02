@@ -15,7 +15,7 @@ namespace Dots
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
         [ReadOnly] private ComponentLookup<BulletDestroyTag> _destroyLookup;
         [ReadOnly] private ComponentLookup<BulletTriggerData> _triggerDataLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
@@ -32,7 +32,7 @@ namespace Dots
             _destroyLookup = state.GetComponentLookup<BulletDestroyTag>(true);
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
             _triggerDataLookup = state.GetComponentLookup<BulletTriggerData>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
@@ -58,7 +58,7 @@ namespace Dots
             _destroyLookup.Update(ref state);
             _creatureTag.Update(ref state);
             _triggerDataLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
@@ -83,7 +83,7 @@ namespace Dots
             {
                 CacheEntity = cacheEntity,
                 CacheLookup = _cacheLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
                 BuffCommonLookup = _buffCommonLookup,
                 BuffTagLookup = _buffTagLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
@@ -137,7 +137,7 @@ namespace Dots
         {
             public Entity CacheEntity;
             [ReadOnly] public ComponentLookup<BulletTriggerData> TriggerDataLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
@@ -153,8 +153,8 @@ namespace Dots
                     return;
                 }
 
-                var addFactor = AttrHelper.GetDamageRangeFactor(properties.ValueRO.MasterCreature, CreatureLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, true);
-                addFactor += BuffHelper.GetBuffAddFactor(properties.ValueRO.MasterCreature, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.BulletScale, config.Id, config.ClassId);
+                var addFactor = AttrHelper.GetDamageRangeFactor(properties.ValueRO.MasterCreature, SummonLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, true);
+                addFactor += BuffHelper.GetBuffAddFactor(properties.ValueRO.MasterCreature, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.BulletScale, config.Id, config.ClassId);
                
                 var newScale = BuffHelper.CalcFactor(properties.ValueRO.SourceScale, addFactor);
                 if (TriggerDataLookup.TryGetComponent(entity, out var triggerData))

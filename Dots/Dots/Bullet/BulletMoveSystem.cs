@@ -14,13 +14,13 @@ namespace Dots
     [UpdateAfter(typeof(BulletCheckMasterSystem))]
     public partial struct BulletMoveSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _localToWorldLookup;
         [ReadOnly] private ComponentLookup<BulletBombTag> _bombLookup;
         [ReadOnly] private ComponentLookup<BulletDestroyTag> _destroyLookup;
         [ReadOnly] private BufferLookup<BulletTriggerBuffer> _bulletTriggerBuffer;
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusCenter> _centerLookup;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -31,10 +31,10 @@ namespace Dots
             _bombLookup = state.GetComponentLookup<BulletBombTag>(true);
             _destroyLookup = state.GetComponentLookup<BulletDestroyTag>(true);
             _localToWorldLookup = state.GetComponentLookup<LocalToWorld>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _bulletTriggerBuffer = state.GetBufferLookup<BulletTriggerBuffer>(true);
             _cacheLookup = state.GetComponentLookup<CacheProperties>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _centerLookup = state.GetComponentLookup<StatusCenter>(true);
         }
 
         [BurstCompile]
@@ -57,7 +57,7 @@ namespace Dots
             _localToWorldLookup.Update(ref state);
             _bulletTriggerBuffer.Update(ref state);
             _cacheLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _centerLookup.Update(ref state);
 
             var deltaTime = SystemAPI.Time.DeltaTime;
             var ecb = new EntityCommandBuffer(Allocator.TempJob);
@@ -75,7 +75,7 @@ namespace Dots
                 BombLookup = _bombLookup,
                 DestroyLookup = _destroyLookup,
                 BulletTriggerBuffer = _bulletTriggerBuffer,
-                CreatureLookup = _creatureLookup,
+                CenterLookup = _centerLookup,
             }.ScheduleParallel();
             state.Dependency.Complete();
 
@@ -91,11 +91,11 @@ namespace Dots
             public Entity CacheEntity;
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
             [ReadOnly] public ComponentLookup<LocalToWorld> TransformLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<BulletBombTag> BombLookup;
             [ReadOnly] public ComponentLookup<BulletDestroyTag> DestroyLookup;
             [ReadOnly] public BufferLookup<BulletTriggerBuffer> BulletTriggerBuffer;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusCenter> CenterLookup;
 
             [BurstCompile]
             private void Execute(RefRW<LocalTransform> localTransform, RefRW<BulletProperties> properties, RefRW<RandomSeed> random, Entity entity, [EntityIndexInQuery] int sortKey)
@@ -150,9 +150,9 @@ namespace Dots
                 }
                 else if (TransformLookup.TryGetComponent(properties.ValueRO.AroundEntity, out var aroundEntityTrans))
                 {
-                    if (CreatureLookup.TryGetComponent(properties.ValueRO.AroundEntity, out var aroundCreature))
+                    if (CenterLookup.TryGetComponent(properties.ValueRO.AroundEntity, out var aroundCreature))
                     {
-                        aroundCenterPos = CreatureHelper.getCenterPos(aroundEntityTrans.Position, aroundCreature, aroundEntityTrans.Value.Scale().x) + properties.ValueRO.AroundCenterOffset;
+                        aroundCenterPos = CreatureHelper.GetCenterPos(aroundEntityTrans.Position, aroundCreature, aroundEntityTrans.Value.Scale().x) + properties.ValueRO.AroundCenterOffset;
                     }
                     else
                     {
@@ -241,9 +241,9 @@ namespace Dots
                     {
                         var targetDead = DeadLookup.HasComponent(properties.ValueRO.HeadingToTarget) && DeadLookup.IsComponentEnabled(properties.ValueRO.HeadingToTarget);
                         if (!targetDead && TransformLookup.TryGetComponent(properties.ValueRO.HeadingToTarget, out var targetTrans) && 
-                            CreatureLookup.TryGetComponent(properties.ValueRO.HeadingToTarget, out var headingCreature))
+                            CenterLookup.TryGetComponent(properties.ValueRO.HeadingToTarget, out var headingCreature))
                         {
-                            var tar =  CreatureHelper.getCenterPos(targetTrans.Position, headingCreature, targetTrans.Value.Scale().x) + properties.ValueRO.HeadingOffset;
+                            var tar =  CreatureHelper.GetCenterPos(targetTrans.Position, headingCreature, targetTrans.Value.Scale().x) + properties.ValueRO.HeadingOffset;
                             var angleToTarget = math.normalizesafe(tar - localTransform.ValueRO.Position);
                             properties.ValueRW.D1 = math.lerp(properties.ValueRO.D1, angleToTarget, properties.ValueRO.VTurn * DeltaTime);
                         }

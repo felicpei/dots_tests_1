@@ -16,9 +16,9 @@ namespace Dots
     public partial struct BulletHitSystem : ISystem
     {
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _transformLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private ComponentLookup<DisableBulletHitTag> _disableBulletHitLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
@@ -33,6 +33,7 @@ namespace Dots
         [ReadOnly] private ComponentLookup<BulletRepel> _bulletRepelLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
+        [ReadOnly] private ComponentLookup<CreatureTag> _creatureTagLookup;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -44,9 +45,10 @@ namespace Dots
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _bombLookup = state.GetComponentLookup<BulletBombTag>(true);
             _destroyLookup = state.GetComponentLookup<BulletDestroyTag>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _transformLookup = state.GetComponentLookup<LocalToWorld>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _creatureTagLookup = state.GetComponentLookup<CreatureTag>(true);
             _disableBulletHitLookup = state.GetComponentLookup<DisableBulletHitTag>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
@@ -80,7 +82,8 @@ namespace Dots
             _destroyLookup.Update(ref state);
             _deadLookup.Update(ref state);
             _transformLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _creatureTagLookup.Update(ref state);
             _disableBulletHitLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
@@ -108,7 +111,7 @@ namespace Dots
                 SkillEntitiesLookup = _skillEntitiesLookup,
                 DeadLookup = _deadLookup,
                 TransformLookup = _transformLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
                 DisableBulletHitLookup = _disableBulletHitLookup,
                 CollisionWorld = collisionWorld,
                 BuffAppendBuffToBullet = _buffAppendBuffToBullet,
@@ -123,6 +126,7 @@ namespace Dots
                 BulletRepelLookup = _bulletRepelLookup,
                 AttrLookup = _attrLookup,
                 AttrModifyLookup = _attrModifyLookup,
+                CreatureTagLookup = _creatureTagLookup,
             }.ScheduleParallel();
             state.Dependency.Complete();
 
@@ -139,9 +143,10 @@ namespace Dots
             public Entity CacheEntity;
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
             [ReadOnly] public BufferLookup<SkillEntities> SkillEntitiesLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<LocalToWorld> TransformLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
+            [ReadOnly] public ComponentLookup<CreatureTag> CreatureTagLookup;
             [ReadOnly] public ComponentLookup<DisableBulletHitTag> DisableBulletHitLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
@@ -181,7 +186,7 @@ namespace Dots
                 {
                     BulletHelper.HitCreature(properties.ValueRO, entity, BulletRepelLookup, GlobalEntity, CacheEntity, CacheLookup, random, hitCreatures, Ecb, sortKey,
                         properties.ValueRO.ForceHitCreature, false, SkillEntitiesLookup, SkillTagLookup, BuffEntitiesLookup, BuffTagLookup,
-                        CreatureLookup, BuffCommonLookup, BuffAppendBuffToBullet, AttrLookup, AttrModifyLookup);
+                        SummonLookup, BuffCommonLookup, BuffAppendBuffToBullet, AttrLookup, AttrModifyLookup);
 
                     Ecb.SetComponentEnabled<BulletBombTag>(sortKey, entity, true);
                     return;
@@ -201,7 +206,7 @@ namespace Dots
                         }
                         BulletHelper.HitCreature(properties.ValueRO, entity, BulletRepelLookup, GlobalEntity, CacheEntity, CacheLookup, random, hitCreatures,
                             Ecb, sortKey, hitEntity, false, SkillEntitiesLookup, SkillTagLookup, BuffEntitiesLookup, BuffTagLookup,
-                            CreatureLookup, BuffCommonLookup, BuffAppendBuffToBullet, AttrLookup, AttrModifyLookup);
+                            SummonLookup, BuffCommonLookup, BuffAppendBuffToBullet, AttrLookup, AttrModifyLookup);
                     }
                     return;
                 }
@@ -223,7 +228,7 @@ namespace Dots
                             var hitInfo = hitEntities[i];
                             var hitEntity = hitInfo.Entity;
 
-                            if (CreatureLookup.HasComponent(hitEntity) && TransformLookup.TryGetComponent(hitEntity, out var hitTransform))
+                            if (SummonLookup.HasComponent(hitEntity) && TransformLookup.TryGetComponent(hitEntity, out var hitTransform))
                             {
                                 var dist = math.distance(localTransform.Position, hitTransform.Position);
                                 var validDist = checkRadius + hitTransform.Value.Scale().x / 2f;
@@ -239,7 +244,7 @@ namespace Dots
 
                                         BulletHelper.HitCreature(properties.ValueRO, entity, BulletRepelLookup, GlobalEntity, CacheEntity, CacheLookup, random, hitCreatures,
                                             Ecb, sortKey, hitEntity, false, SkillEntitiesLookup, SkillTagLookup, BuffEntitiesLookup, BuffTagLookup,
-                                            CreatureLookup, BuffCommonLookup, BuffAppendBuffToBullet, AttrLookup, AttrModifyLookup);
+                                            SummonLookup, BuffCommonLookup, BuffAppendBuffToBullet, AttrLookup, AttrModifyLookup);
                                     }
                                 }
                             }
@@ -249,7 +254,7 @@ namespace Dots
                 }
 
                 //buff banHit (有buff则优先判断buff，不再判断config里的）
-                var banHitBuffs = BuffHelper.GetBuffAttachInt(properties.ValueRO.MasterCreature, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.BulletChangeBanHit, config.Id, config.ClassId);
+                var banHitBuffs = BuffHelper.GetBuffAttachInt(properties.ValueRO.MasterCreature, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.BulletChangeBanHit, config.Id, config.ClassId);
                 if (banHitBuffs.Length > 0)
                 {
                     foreach (var value in banHitBuffs)
@@ -362,7 +367,7 @@ namespace Dots
                             if (TryBulletHit(entity, hitEntity, hitInfo.SurfaceNormal, properties, atkValue, localTransform, config, random,
                                     GlobalEntity, CacheLookup, CacheEntity,
                                     SkillEntitiesLookup, SkillTagLookup, BulletRepelLookup, AttrLookup, AttrModifyLookup,
-                                    BuffAppendBuffToBullet, BulletTriggerBuffer, hitCreatures, CreatureLookup, DeadLookup,
+                                    BuffAppendBuffToBullet, BulletTriggerBuffer, hitCreatures, SummonLookup, CreatureTagLookup, DeadLookup,
                                     DisableBulletHitLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, Ecb, sortKey))
                             {
                                 break;
@@ -384,7 +389,7 @@ namespace Dots
 
                             if (TryBulletHit(entity, hitEntity,  hitInfo.SurfaceNormal, properties, atkValue, localTransform, config, random, 
                                     GlobalEntity, CacheLookup, CacheEntity,SkillEntitiesLookup, SkillTagLookup, BulletRepelLookup, AttrLookup, AttrModifyLookup,
-                                    BuffAppendBuffToBullet, BulletTriggerBuffer, hitCreatures, CreatureLookup, DeadLookup, DisableBulletHitLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, Ecb, sortKey))
+                                    BuffAppendBuffToBullet, BulletTriggerBuffer, hitCreatures, SummonLookup, CreatureTagLookup,  DeadLookup, DisableBulletHitLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, Ecb, sortKey))
                             {
                                 break;
                             }
@@ -396,21 +401,25 @@ namespace Dots
             }
 
             private static bool TryBulletHit(Entity bulletEntity, Entity hitEntity, float3 surfaceNormal, 
-                RefRW<BulletProperties> properties, RefRW<BulletAtkValue> atkValue, LocalToWorld localTransform, BulletConfig config, RefRW<RandomSeed> random,
+                RefRW<BulletProperties> properties, RefRW<BulletAtkValue> atkValue, LocalToWorld localTransform, 
+                BulletConfig config, RefRW<RandomSeed> random,
                 Entity globalEntity, ComponentLookup<CacheProperties> cacheLookup, Entity cacheEntity, 
                 BufferLookup<SkillEntities> skillEntitiesLookup, ComponentLookup<SkillTag> skillTagLookup,
-                ComponentLookup<BulletRepel> bulletRepelLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> modifyLookup,
+                ComponentLookup<BulletRepel> bulletRepelLookup, ComponentLookup<PlayerAttrData> attrLookup, 
+                BufferLookup<PlayerAttrModify> modifyLookup,
                 ComponentLookup<BuffAppendRandomIds> buffAppendBuffToBullet, BufferLookup<BulletTriggerBuffer> bulletTriggerBuffer,
-                DynamicBuffer<BulletHitCreature> hitCreatures, ComponentLookup<CreatureProperties> creatureLookup, 
-                ComponentLookup<InDeadTag> deadLookup, ComponentLookup<DisableBulletHitTag> disableBulletHitLookup,
+                DynamicBuffer<BulletHitCreature> hitCreatures, ComponentLookup<StatusSummon> summonLookup, 
+                ComponentLookup<CreatureTag> creatureTagLookup, 
+                ComponentLookup<InDeadState> deadLookup, ComponentLookup<DisableBulletHitTag> disableBulletHitLookup,
                 BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup,
                 ComponentLookup<BuffCommonData> buffCommonLookup, EntityCommandBuffer.ParallelWriter ecb, int sortKey)
             {
-                if (!creatureLookup.TryGetComponent(hitEntity, out var hitCreature))
+
+                if (!creatureTagLookup.TryGetComponent(hitEntity, out var hitCreature))
                 {
                     return false;
                 }
-
+                
                 if (deadLookup.IsComponentEnabled(hitEntity))
                 {
                     return false;
@@ -422,7 +431,8 @@ namespace Dots
                     return false;
                 }
 
-                if (!DamageHelper.CheckHitRule(config.HitSameTeam, properties.ValueRO.MasterCreature, properties.ValueRO.Team, hitEntity, hitCreature.AtkValue.Team))
+                if (!DamageHelper.CheckHitRule(config.HitSameTeam, 
+                        properties.ValueRO.MasterCreature, properties.ValueRO.Team, hitEntity, hitCreature.TeamId))
                 {
                     return false;
                 }
@@ -430,11 +440,11 @@ namespace Dots
                 //看这个creature是否有反弹子弹的buff，如果有则反弹
                 if (BulletHelper.CheckCanReflect(properties.ValueRO))
                 {
-                    if (BuffHelper.CheckBuffProb(hitEntity, creatureLookup, random, EBuffType.ReflectBullet, buffEntitiesLookup, buffTagLookup, buffCommonLookup, out var attachInt))
+                    if (BuffHelper.CheckBuffProb(hitEntity, summonLookup, random, EBuffType.ReflectBullet, buffEntitiesLookup, buffTagLookup, buffCommonLookup, out var attachInt))
                     {
                         //反弹子弹
                         var noChangeTeam = attachInt == 1;
-                        ReflectBullet(properties, atkValue, surfaceNormal, hitCreature.AtkValue.Team, localTransform, noChangeTeam);
+                        ReflectBullet(properties, atkValue, surfaceNormal, hitCreature.TeamId, localTransform, noChangeTeam);
                         return true;
                     }
                 }
@@ -453,7 +463,7 @@ namespace Dots
                 
                 BulletHelper.HitCreature(properties.ValueRO, bulletEntity, bulletRepelLookup, globalEntity, cacheEntity, cacheLookup, random, hitCreatures,
                     ecb, sortKey, hitEntity, false, skillEntitiesLookup, skillTagLookup, buffEntitiesLookup,
-                    buffTagLookup, creatureLookup, buffCommonLookup, buffAppendBuffToBullet, attrLookup, modifyLookup);
+                    buffTagLookup, summonLookup, buffCommonLookup, buffAppendBuffToBullet, attrLookup, modifyLookup);
 
                 //记录伤害次数
                 properties.ValueRW.CurrDamageCount = properties.ValueRO.CurrDamageCount + 1;

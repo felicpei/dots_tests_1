@@ -14,19 +14,21 @@ namespace Dots
     {
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
-        
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<GlobalInitialized>();
             state.RequireForUpdate<LocalPlayerTag>();
             state.RequireForUpdate<CacheProperties>();
-            
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
@@ -45,15 +47,16 @@ namespace Dots
 
             _attrLookup.Update(ref state);
             _attrModifyLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _hpLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
-            
+
             //初始化
             var ecb = new EntityCommandBuffer(Allocator.Temp);
-            foreach (var (tag, servant, creature, transform, entity) 
-                     in SystemAPI.Query<ServantInitTag, RefRW<ServantProperties>, RefRW<CreatureProperties>, LocalTransform>().WithEntityAccess())
+            foreach (var (tag, servant, props, hpInfo, transform, entity)
+                     in SystemAPI.Query<ServantInitTag, RefRW<ServantProperties>, CreatureProps, RefRW<StatusHp>, LocalTransform>().WithEntityAccess())
             {
                 ecb.RemoveComponent<ServantInitTag>(entity);
 
@@ -62,18 +65,18 @@ namespace Dots
                     continue;
                 }
 
-                creature.ValueRW.CurHp = AttrHelper.GetMaxHp(entity, _attrLookup, _attrModifyLookup, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
-              
+                hpInfo.ValueRW.CurHp = AttrHelper.GetMaxHp(entity, _attrLookup, _attrModifyLookup, _hpLookup, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
+
                 //来自外部养成系统技能
                 for (var j = 0; j < FightData.ServantSkills.Count; j++)
                 {
                     var info = FightData.ServantSkills[j];
                     if (info.Id == config.Id)
                     {
-                        SkillHelper.AddSkill(global.Entity, entity, info.SkillId, creature.ValueRO.AtkValue, transform.Position, ecb);
+                        SkillHelper.AddSkill(global.Entity, entity, info.SkillId, props.AtkValue, transform.Position, ecb);
                     }
                 }
-                
+
                 //add rarity skills
                 var dp = Table.GetServantSkill(servant.ValueRO.Id, (int)tag.Rarity);
                 if (dp != null)
@@ -84,14 +87,14 @@ namespace Dots
                     }
                     else
                     {
-                        SkillHelper.AddSkill(global.Entity, entity, dp.MainSkill, creature.ValueRO.AtkValue, transform.Position, ecb);
+                        SkillHelper.AddSkill(global.Entity, entity, dp.MainSkill, props.AtkValue, transform.Position, ecb);
                     }
 
                     if (dp.UpgradeSkills != null)
                     {
                         foreach (var skillId in dp.UpgradeSkills)
                         {
-                            SkillHelper.AddSkill(global.Entity, entity, skillId, creature.ValueRO.AtkValue, transform.Position, ecb);
+                            SkillHelper.AddSkill(global.Entity, entity, skillId, props.AtkValue, transform.Position, ecb);
                         }
                     }
                 }
@@ -100,6 +103,7 @@ namespace Dots
                     Debug.LogError($"add servant error, id:{servant.ValueRO.Id} rarity:{tag.Rarity}");
                 }
             }
+
             ecb.Playback(state.EntityManager);
             ecb.Dispose();
         }

@@ -13,7 +13,7 @@ namespace Dots
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
 
@@ -26,7 +26,7 @@ namespace Dots
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
         }
@@ -45,7 +45,7 @@ namespace Dots
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _attrLookup.Update(ref state);
             _attrModifyLookup.Update(ref state);
 
@@ -119,11 +119,11 @@ namespace Dots
             var normalPool = GetNormalPool(global, currSpawn, missionDeploy.Id);
             var totalSec = currSpawn.Sec;
 
-            var extraCount = BuffHelper.GetBuffAddFactor(localPlayer, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.MissionBuff_MonsterCount, 1);
+            var extraCount = BuffHelper.GetBuffAddFactor(localPlayer, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.MissionBuff_MonsterCount, 1);
             var multiple = (int)(1 + extraCount);
 
             //attr monsterCount
-            var attrEnemyCountFac = AttrHelper.GetAttr(localPlayer, EAttr.EnemyCount, _attrLookup, _attrModifyLookup, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
+            var attrEnemyCountFac = AttrHelper.GetAttr(localPlayer, EAttr.EnemyCount, _attrLookup, _attrModifyLookup, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
             var minFac = AttrHelper.GetMin(EAttr.EnemyCount);
             if (attrEnemyCountFac < minFac)
             {
@@ -151,7 +151,7 @@ namespace Dots
             for (var i = 0; currSpawn.DefaultTemplate != null && i < currSpawn.DefaultTemplate.Count; i++)
             {
                 var templateId = currSpawn.DefaultTemplate[i];
-                DoTemplate(global, cache, ecb, templateId, currSpawn.Sec, currSpawn.Hp, currSpawn.Speed, poolDeploy, localPlayer, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, ref idSeq, out var templateMonsterCount);
+                DoTemplate(global, cache, ecb, templateId, currSpawn.Sec, currSpawn.Hp, currSpawn.Speed, poolDeploy, localPlayer, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, ref idSeq, out var templateMonsterCount);
                 totalMonsterCount += templateMonsterCount;
             }
 
@@ -242,7 +242,7 @@ namespace Dots
 
         private static void DoTemplate(GlobalAspect global, CacheAspect cache, EntityCommandBuffer ecb,
             int templateId, float totalSec, float baseHp, float speed, SpawnPool poolDeploy,
-            Entity localPlayer, ComponentLookup<CreatureProperties> creatureLookup, BufferLookup<BuffEntities> buffEntitiesLookup,
+            Entity localPlayer, ComponentLookup<StatusSummon> summonLookup, BufferLookup<BuffEntities> buffEntitiesLookup,
             ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             ref int idSeq, out int totalMonsterCount)
         {
@@ -305,7 +305,7 @@ namespace Dots
                     {
                         //血量权值
                         var hp = baseHp * templateDeploy.HpFac;
-                        var extraCount = BuffHelper.GetBuffAddFactor(localPlayer, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MissionBuff_MonsterCount, 2);
+                        var extraCount = BuffHelper.GetBuffAddFactor(localPlayer, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MissionBuff_MonsterCount, 2);
                         var eliteCount = (int)(1 + extraCount);
 
                         //将小怪自动变为精英
@@ -325,7 +325,7 @@ namespace Dots
                         if (eliteList.Count > 0)
                         {
                             //处理精英变boss的buff
-                            var bChangeToBoss = BuffHelper.GetHasBuff(localPlayer, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MissionBuff_EliteToBoss);
+                            var bChangeToBoss = BuffHelper.GetHasBuff(localPlayer, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MissionBuff_EliteToBoss);
                             var monsterIds = bChangeToBoss ? poolDeploy.GetSpawnPoolAllBossId() : eliteList.ToList();
 
                             for (var i = 0; i < eliteCount; i++)
@@ -359,7 +359,7 @@ namespace Dots
                             CreateNotice(global, ecb, delaySec - 5, EBattleNotice.BossComing);
                         }
 
-                        var extraCount = BuffHelper.GetBuffAddFactor(localPlayer, creatureLookup,
+                        var extraCount = BuffHelper.GetBuffAddFactor(localPlayer, summonLookup,
                             buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MissionBuff_MonsterCount, 3);
 
                         var bossCount = (int)(1 + extraCount);

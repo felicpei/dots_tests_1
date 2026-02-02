@@ -13,11 +13,11 @@ namespace Dots
     {
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
         [ReadOnly] private ComponentLookup<MonsterProperties> _monsterLookup;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -27,11 +27,11 @@ namespace Dots
                 
             _monsterLookup = state.GetComponentLookup<MonsterProperties>(true);
             _cacheLookup = state.GetComponentLookup<CacheProperties>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
         }
 
         [BurstCompile]
@@ -55,7 +55,7 @@ namespace Dots
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
 
             var ecb = new EntityCommandBuffer(Allocator.TempJob);
             var deltaTime = SystemAPI.Time.DeltaTime;
@@ -74,7 +74,7 @@ namespace Dots
                 CacheEntity = cacheEntity,
                 DeadLookup = _deadLookup,
                 MonsterLookup = _monsterLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
             }.ScheduleParallel();
             state.Dependency.Complete();
 
@@ -95,13 +95,13 @@ namespace Dots
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
             [ReadOnly] public ComponentLookup<MonsterProperties> MonsterLookup;
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
             
             [BurstCompile]
             private void Execute(RefRW<CreatureAbsorbTag> tag, RefRW<LocalTransform> local, Entity entity, [EntityIndexInQuery] int sortKey)
             {
-                if (DeadLookup.IsComponentEnabled(entity) || BuffHelper.GetHasBuff(entity, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.Invincible))
+                if (DeadLookup.IsComponentEnabled(entity) || BuffHelper.GetHasBuff(entity, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.Invincible))
                 {
                     Ecb.SetComponentEnabled<CreatureAbsorbTag>(sortKey, entity, false);
                     return;

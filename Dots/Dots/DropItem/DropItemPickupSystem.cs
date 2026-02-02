@@ -17,7 +17,7 @@ namespace Dots
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
         
@@ -33,7 +33,7 @@ namespace Dots
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
             _cacheLookup = state.GetComponentLookup<CacheProperties>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
         }
@@ -61,7 +61,7 @@ namespace Dots
                 _buffTagLookup.Update(ref state);
                 _buffCommonLookup.Update(ref state);
                 _cacheLookup.Update(ref state);
-                _creatureLookup.Update(ref state);
+                _summonLookup.Update(ref state);
                 _attrLookup.Update(ref state);
                 _attrModifyLookup.Update(ref state);
 
@@ -84,7 +84,7 @@ namespace Dots
                     BuffCommonLookup = _buffCommonLookup,
                     CacheLookup = _cacheLookup,
                     CacheEntity = cacheEntity,
-                    CreatureLookup = _creatureLookup,
+                    SummonLookup = _summonLookup,
                     AttrLookup = _attrLookup,
                     AttrModifyLookup = _attrModifyLookup,
                 }.ScheduleParallel();
@@ -109,7 +109,7 @@ namespace Dots
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
             [ReadOnly] public ComponentLookup<PlayerAttrData> AttrLookup;
             [ReadOnly] public BufferLookup<PlayerAttrModify> AttrModifyLookup;
             
@@ -136,7 +136,7 @@ namespace Dots
                 else
                 {
                     //检查buff
-                    var addFactor = AttrHelper.GetAttr(LocalPlayer, EAttr.PickupRange, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                    var addFactor = AttrHelper.GetAttr(LocalPlayer, EAttr.PickupRange, AttrLookup, AttrModifyLookup, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                     radius = BuffHelper.CalcFactor2(radius, addFactor);
                 }
                 

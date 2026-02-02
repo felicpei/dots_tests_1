@@ -16,16 +16,17 @@ namespace Dots
         [ReadOnly] private ComponentLookup<HybridEvent_PlayAnimation> _eventPlayAnimation;
         [ReadOnly] private ComponentLookup<HybridEvent_PlayMuzzleEffect> _eventPlayMuzzle;
         [ReadOnly] private ComponentLookup<HybridEvent_StopMuzzleEffect> _eventStopMuzzle;
-        
+
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _transformLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
         [ReadOnly] private ComponentLookup<ShieldProperties> _shieldLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
-        
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<GlobalInitialized>();
@@ -40,7 +41,8 @@ namespace Dots
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
             _transformLookup = state.GetComponentLookup<LocalToWorld>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
@@ -59,7 +61,8 @@ namespace Dots
             _eventPlayMuzzle.Update(ref state);
             _eventStopMuzzle.Update(ref state);
             _transformLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _hpLookup.Update(ref state);
             _shieldLookup.Update(ref state);
             _attrLookup.Update(ref state);
             _attrModifyLookup.Update(ref state);
@@ -67,7 +70,7 @@ namespace Dots
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
             _eventChangeServant.Update(ref state);
-            
+
             var ecb = new EntityCommandBuffer(Allocator.Temp);
             var global = SystemAPI.GetAspect<GlobalAspect>(SystemAPI.GetSingletonEntity<GlobalInitialized>());
 
@@ -86,8 +89,8 @@ namespace Dots
 
 
             //servant
-            foreach (var (controller, forward, weaponPosLists, creature, blend, localToWorld, entity)
-                     in SystemAPI.Query<HybridServantController, CreatureForward, DynamicBuffer<ServantWeaponPosList> ,CreatureProperties, MaterialBlend, LocalToWorld>().WithEntityAccess())
+            foreach (var (controller, forward, weaponPosLists, move, blend, localToWorld, entity)
+                     in SystemAPI.Query<HybridServantController, StatusForward, DynamicBuffer<ServantWeaponPosList>, StatusMove, MaterialBlend, LocalToWorld>().WithEntityAccess())
             {
                 UpdateBase(global, localToWorld, controller.Value, blend, entity, ecb);
 
@@ -97,14 +100,17 @@ namespace Dots
                     foreach (var weaponPos in controller.Value.Weapons)
                     {
                         weaponPosLists.Add(new ServantWeaponPosList { Value = weaponPos.transform.position - controller.Value.transform.position });
-                    }    
+                    }
                 }
-                
+
                 //hud
                 controller.Hud.UpdateAim(forward.FaceForward);
 
                 //hp
-                controller.Hud.SetHp(creature.CurHp, AttrHelper.GetMaxHp(entity, _attrLookup, _attrModifyLookup, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup));
+                if (_hpLookup.TryGetComponent(entity, out var hpInfo))
+                {
+                    controller.Hud.SetHp(hpInfo.CurHp, AttrHelper.GetMaxHp(entity, _attrLookup, _attrModifyLookup, _hpLookup, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup));
+                }
 
                 var shieldValue = 0f;
                 var shieldMaxValue = 0f;
@@ -113,10 +119,10 @@ namespace Dots
                     shieldValue = shield.Value;
                     shieldMaxValue = shield.MaxValue;
                 }
-                
+
                 controller.Hud.SetShield(shieldValue, shieldMaxValue);
-                controller.Value.UpdateMove(creature.InMoveCopy);
-                
+                controller.Value.UpdateMove(move.InMove);
+
                 if (_eventChangeServant.TryGetComponent(entity, out var eventChange))
                 {
                     ecb.RemoveComponent<HybridEvent_ChangeServant>(entity);
@@ -131,7 +137,7 @@ namespace Dots
             {
                 controller.Value.UpdateProgress(fillRate.Value);
             }
-            
+
             //dropitem
             foreach (var (controller, tag) in SystemAPI.Query<HybridDropItemController, DropItemIdleTag>())
             {
@@ -213,7 +219,7 @@ namespace Dots
                 }
             }
 
-            
+
             //play muzzle effect
             {
                 if (_eventPlayMuzzle.TryGetComponent(entity, out var eventInfo) && _eventPlayMuzzle.IsComponentEnabled(entity))
@@ -221,7 +227,7 @@ namespace Dots
                     ecb.SetComponentEnabled<HybridEvent_PlayMuzzleEffect>(entity, false);
                     controller.PlayMuzzleEffect(eventInfo.EffectId, eventInfo.Delay);
                 }
-                
+
                 if (_eventStopMuzzle.HasComponent(entity) && _eventStopMuzzle.IsComponentEnabled(entity))
                 {
                     ecb.SetComponentEnabled<HybridEvent_StopMuzzleEffect>(entity, false);

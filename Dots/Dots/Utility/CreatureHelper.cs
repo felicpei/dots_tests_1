@@ -15,39 +15,50 @@ namespace Dots
         {
             //标记为Creature
             var atkValue = new AtkValue(props.Atk * atkFactor, props.Crit, props.CritDamage, teamId);
-            ecb.AddComponent(entity, new CreatureProperties
+            ecb.AddComponent(entity, new CreatureTag
             {
-                BelongElementId = belongElement,
                 Type = type,
+                TeamId = atkValue.Team,
+                BelongElementId = belongElement,
+            });
+
+            ecb.AddComponent(entity, new CreatureProps
+            {
                 AtkValue = atkValue,
-                FullHp = props.Hp,
-                CurHp = props.Hp * hpPercent,
                 RepelCd = props.RepelCd,
                 Def = props.Def,
                 SpeedFac = props.SpeedFac,
-                
+                OriginScale = originScale,
+            });
+            
+            ecb.AddComponent(entity, new StatusCenter
+            {
+                CenterY = centerY
+            });
+            
+            ecb.AddComponent(entity, new StatusHp
+            {
+                FullHp = props.Hp,
+                CurHp = props.Hp * hpPercent,
+            });
+            
+            ecb.AddComponent(entity, new StatusSummon
+            {
                 SummonParent = summonParent,
                 SelfConfigId = selfSummonId,
-                OriginScale = originScale,
-                CenterY = centerY,
+                SelfType = type,
             });
-
-            ecb.AddComponent(entity, new CreatureMove
+            
+            ecb.AddComponent(entity, new StatusMove
             {
                 MoveSpeedSource = moveSpeed,
                 MoveSpeedResult = moveSpeed,
             });
 
-            ecb.AddComponent(entity, new CreatureForward
+            ecb.AddComponent(entity, new StatusForward
             {
                 FaceForward = new float3(0, 0, 1),
                 MoveForward = new float3(1, 0, 0),
-            });
-
-            ecb.AddComponent(entity, new CreatureTag
-            {
-                Type = type,
-                TeamId = atkValue.Team,
             });
 
             ecb.AddComponent(entity, new CreatureMuzzlePos
@@ -92,8 +103,8 @@ namespace Dots
             //伤害数字缓存设置
             ecb.AddBuffer<DamageNumberBuffer>(entity);
 
-            ecb.AddComponent<InAttackTag>(entity);
-            ecb.SetComponentEnabled<InAttackTag>(entity, false);
+            ecb.AddComponent<InAttackState>(entity);
+            ecb.SetComponentEnabled<InAttackState>(entity, false);
 
             //状态处理
             ecb.AddBuffer<CreatureDataProcess>(entity);
@@ -115,8 +126,8 @@ namespace Dots
             ecb.AddComponent<EnterHitTag>(entity);
             ecb.SetComponentEnabled<EnterHitTag>(entity, false);
 
-            ecb.AddComponent<InDeadTag>(entity);
-            ecb.SetComponentEnabled<InDeadTag>(entity, false);
+            ecb.AddComponent<InDeadState>(entity);
+            ecb.SetComponentEnabled<InDeadState>(entity, false);
 
             ecb.AddComponent<CollisionDamageCdTag>(entity);
             ecb.SetComponentEnabled<CollisionDamageCdTag>(entity, false);
@@ -147,14 +158,14 @@ namespace Dots
             ecb.AddComponent<RemoveFreezeTag>(entity);
             ecb.SetComponentEnabled<RemoveFreezeTag>(entity, false);
 
-            ecb.AddComponent<InFreezeTag>(entity);
-            ecb.SetComponentEnabled<InFreezeTag>(entity, false);
+            ecb.AddComponent<InFreezeState>(entity);
+            ecb.SetComponentEnabled<InFreezeState>(entity, false);
 
             ecb.AddComponent<InBornTag>(entity);
             ecb.SetComponentEnabled<InBornTag>(entity, false);
 
-            ecb.AddComponent<InRepelTag>(entity);
-            ecb.SetComponentEnabled<InRepelTag>(entity, false);
+            ecb.AddComponent<InRepelState>(entity);
+            ecb.SetComponentEnabled<InRepelState>(entity, false);
 
             ecb.AddComponent<CreatureAbsorbTag>(entity);
             ecb.SetComponentEnabled<CreatureAbsorbTag>(entity, false);
@@ -189,14 +200,20 @@ namespace Dots
         }
 
 
-        public static float GetMoveSpeedFactor(Entity entity, ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<ShieldProperties> shieldLookup,
-            BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
-            ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup)
+        public static float GetMoveSpeedFactor(Entity entity, 
+            ComponentLookup<StatusSummon> summonLookup,
+            ComponentLookup<CreatureProps> propLookup, 
+            ComponentLookup<ShieldProperties> shieldLookup,
+            BufferLookup<BuffEntities> buffEntitiesLookup,
+            ComponentLookup<BuffTag> buffTagLookup, 
+            ComponentLookup<BuffCommonData> buffCommonLookup,
+            ComponentLookup<PlayerAttrData> attrLookup, 
+            BufferLookup<PlayerAttrModify> attrModifyLookup)
         {
             var addFactor = 0f;
 
             //base
-            if (creatureLookup.TryGetComponent(entity, out var creature) && creature.SpeedFac != 0)
+            if (propLookup.TryGetComponent(entity, out var creature) && creature.SpeedFac != 0)
             {
                 addFactor = creature.SpeedFac;
             }
@@ -204,12 +221,12 @@ namespace Dots
             //buff
             var hasShield = CheckHasShield(entity, shieldLookup);
             {
-                var resSpeed = BuffHelper.GetBuffFactorAndValue(entity, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MoveSpeed, checkBool: hasShield);
+                var resSpeed = BuffHelper.GetBuffFactorAndValue(entity, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MoveSpeed, checkBool: hasShield);
                 addFactor += resSpeed.AddFactor;
             }
             
             //attr
-            addFactor += AttrHelper.GetAttr(entity, EAttr.MoveSpeed, attrLookup, attrModifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+            addFactor += AttrHelper.GetAttr(entity, EAttr.MoveSpeed, attrLookup, attrModifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
 
             return addFactor;
         }
@@ -399,7 +416,7 @@ namespace Dots
                 return;
             }
 
-            ecb.SetComponent(entity, new CreatureForward
+            ecb.SetComponent(entity, new StatusForward
             {
                 FaceForward = dir,
                 MoveForward = dir,
@@ -414,14 +431,14 @@ namespace Dots
                 return;
             }
 
-            ecb.SetComponent(sortKey, entity, new CreatureForward
+            ecb.SetComponent(sortKey, entity, new StatusForward
             {
                 FaceForward = dir,
                 MoveForward = dir,
             });
         }
 
-        public static void CountMoveDist(Entity entity, RefRW<CreatureMove> creatureMove, float moveDist, BufferLookup<SkillEntities> skillEntitiesLookup, ComponentLookup<SkillTag> skillTagLookup, EntityCommandBuffer ecb)
+        public static void CountMoveDist(Entity entity, RefRW<StatusMove> creatureMove, float moveDist, BufferLookup<SkillEntities> skillEntitiesLookup, ComponentLookup<SkillTag> skillTagLookup, EntityCommandBuffer ecb)
         {
             //每移动1M的技能触发
             creatureMove.ValueRW.MoveDistTemp = creatureMove.ValueRO.MoveDistTemp + moveDist;
@@ -435,7 +452,7 @@ namespace Dots
             }
         }
 
-        public static void CountMoveDist(Entity entity, RefRW<CreatureMove> creatureMove, float moveDist, BufferLookup<SkillEntities> skillEntitiesLookup, ComponentLookup<SkillTag> skillTagLookup,
+        public static void CountMoveDist(Entity entity, RefRW<StatusMove> creatureMove, float moveDist, BufferLookup<SkillEntities> skillEntitiesLookup, ComponentLookup<SkillTag> skillTagLookup,
             EntityCommandBuffer.ParallelWriter ecb, int sortKey)
         {
             //每移动1M的技能触发
@@ -533,8 +550,13 @@ namespace Dots
         }
 
         //处理全局风对坐标的影响
-        public static void CalcWindPos(Entity localPlayer, Entity creatureEntity, float deltaTime, RefRW<LocalTransform> localTransform, ComponentLookup<CreatureProperties> creatureLookup,
-            BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
+        public static void CalcWindPos(Entity localPlayer, Entity creatureEntity, float deltaTime, 
+            RefRW<LocalTransform> localTransform, 
+            ComponentLookup<CreatureTag> creatureLookup,
+            ComponentLookup<StatusSummon> summonLookup,
+            BufferLookup<BuffEntities> buffEntitiesLookup, 
+            ComponentLookup<BuffTag> buffTagLookup, 
+            ComponentLookup<BuffCommonData> buffCommonLookup)
         {
             if (creatureLookup.TryGetComponent(creatureEntity, out var creature))
             {
@@ -545,7 +567,7 @@ namespace Dots
             }
 
             //风速影响
-            var windData = BuffHelper.GetBuffFactorAndValue(localPlayer, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MissionBuff_Wind);
+            var windData = BuffHelper.GetBuffFactorAndValue(localPlayer, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.MissionBuff_Wind);
             if (windData.TempData != 0)
             {
                 var windForward = MathHelper.Angle2Forward(windData.TempData);
@@ -554,35 +576,34 @@ namespace Dots
             }
         }
 
-        public static float3 getCenterPos(float3 pos, CreatureProperties creature, float scale)
+        public static float3 GetCenterPos(float3 pos, StatusCenter center, float scale)
         {
-            pos.y += creature.CenterY * scale;
+            pos.y += center.CenterY * scale;
             return pos;
         }
         
-        public static float3 getHeadPos(float3 pos, CreatureProperties creature, float scale)
+        public static float3 GetHeadPos(float3 pos, StatusCenter center, float scale)
         {
-            pos.y += creature.CenterY * 2 * scale;
+            pos.y += center.CenterY * 2 * scale;
             return pos;
         }
         
-        public static Entity GetMasterRoot(Entity entity, ComponentLookup<CreatureProperties> creatureLookup)
+        public static Entity GetMasterRoot(Entity entity, ComponentLookup<StatusSummon> summonLookup)
         {
             //往上找召唤者，任意一个召唤者拥有，则都计算
             var findEntity = entity;
-            while (creatureLookup.TryGetComponent(findEntity, out var creature) && creatureLookup.HasComponent(creature.SummonParent))
+            while (summonLookup.TryGetComponent(findEntity, out var creature) && summonLookup.HasComponent(creature.SummonParent))
             {
                 findEntity = creature.SummonParent;
             } 
-
             return findEntity;
         }
 
-        public static float3 GetServantBornPos(PlayerAspect playerAspect, GlobalAspect global, int idx, Entity mainServantEntity,
-            ComponentLookup<LocalTransform> transformLookup, ComponentLookup<CreatureForward> forwardLookup)
+        public static float3 GetServantBornPos(LocalToWorld playerTrans, GlobalAspect global, int idx, Entity mainServantEntity,
+            ComponentLookup<LocalTransform> transformLookup, ComponentLookup<StatusForward> forwardLookup)
         {
             //召唤英灵
-            var bornPos = playerAspect.Position;
+            var bornPos = playerTrans.Position;
             bornPos.z += 5;
                         
             if (global.GetSubServantPos(idx, out var targetPos))
@@ -601,7 +622,7 @@ namespace Dots
             return bornPos;
         }
         
-        public static void UnbindServant(PlayerAspect playerAspect, GlobalAspect global, Entity entity, ComponentLookup<LocalTransform> transformLookup,
+        public static void UnbindServant(DynamicBuffer<ServantList> servantLists, GlobalAspect global, Entity entity, ComponentLookup<LocalTransform> transformLookup,
             ComponentLookup<ServantProperties> servantLookup, ComponentLookup<MainServantTag> mainServantLookup, 
             BufferLookup<Child> childLookup, ComponentLookup<EffectProperties> effectLookup, BufferLookup<BindingBullet> bindingBulletLookup,
             ComponentLookup<BulletProperties> bulletLookup, EntityCommandBuffer ecb, float delayDestroy)
@@ -637,12 +658,12 @@ namespace Dots
             //remove bind bullet
             BulletHelper.ClearAllBindingBullet(entity, bindingBulletLookup, bulletLookup, ecb);
             
-            for (var i = playerAspect.Servants.Length - 1; i >= 0; i--)
+            for (var i = servantLists.Length - 1; i >= 0; i--)
             {
-                var buffer = playerAspect.Servants[i];
+                var buffer = servantLists[i];
                 if (buffer.Value == entity)
                 {
-                    playerAspect.Servants.RemoveAt(i);
+                    servantLists.RemoveAt(i);
                 }
                  
                 if (servantLookup.TryGetComponent(buffer.Value, out var servantProperties))

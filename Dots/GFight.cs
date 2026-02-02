@@ -21,6 +21,7 @@ public class GFight : MonoBehaviour
     
     private async void Awake()
     {
+        //DotsEventCenter.Init();
         UIDataTransfer.InFight = true;
         Canvas = await LoadGameObject(PathMissionCanvas);
         await DamageNumberPool.InitPool();
@@ -43,6 +44,7 @@ public class GFight : MonoBehaviour
     {
         fps = 0;
         UIDataTransfer.InFight = false;
+        //DotsEventCenter.Dispose();
 
         if (Canvas != null)
         {

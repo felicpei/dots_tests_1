@@ -1,6 +1,4 @@
 using Deploys;
-using Dots;
-using Dots;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -17,7 +15,7 @@ namespace Dots
     public partial struct MonsterHatredSystem : ISystem
     {
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
         [ReadOnly] private ComponentLookup<CreatureForceTargetTag> _forceTargetLookup;
         [ReadOnly] private ComponentLookup<MonsterMove> _monsterMoveLookup;
@@ -31,7 +29,7 @@ namespace Dots
             state.RequireForUpdate<PhysicsWorldSingleton>();
             
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
             _forceTargetLookup = state.GetComponentLookup<CreatureForceTargetTag>(true);
             _monsterMoveLookup = state.GetComponentLookup<MonsterMove>(true);
@@ -97,7 +95,7 @@ namespace Dots
         {
             public bool InMonsterPause;
             [ReadOnly] public ComponentLookup<CreatureTag> CreatureTagLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<LocalTransform> TransformLookup;
             [ReadOnly] public ComponentLookup<CreatureForceTargetTag> ForceTargetLookup;
             [ReadOnly] public ComponentLookup<MonsterMove> MonsterMoveLookup;
@@ -108,9 +106,13 @@ namespace Dots
             [ReadOnly] public CollisionWorld World;
 
             [BurstCompile]
-            private void Execute(RefRW<MonsterTarget> monsterTarget, CreatureProperties creature, MonsterProperties monster, Entity entity)
+            private void Execute(RefRW<MonsterTarget> monsterTarget, MonsterProperties monster, Entity entity)
             {
-                if (InMonsterPause && creature.AtkValue.Team == ETeamId.Monster)
+                if (!CreatureTagLookup.TryGetComponent(entity, out var creatureTag))
+                {
+                    return;
+                }
+                if (InMonsterPause && creatureTag.TeamId == ETeamId.Monster)
                 {
                     return;
                 }
@@ -120,7 +122,7 @@ namespace Dots
                     return;
                 }
 
-                switch (creature.AtkValue.Team)
+                switch (creatureTag.TeamId)
                 {
                     //找附近10M内最近的怪物
                     case ETeamId.Player:
@@ -128,7 +130,7 @@ namespace Dots
                         if (MonsterMoveLookup.TryGetComponent(entity, out var monsterMove) && monsterMove.Mode == EMonsterMoveMode.Direct)
                         {
                             var bHasTarget = false;
-                            if (PhysicsHelper.GetNearestEnemy(entity, World, localTransform.Position, 10, CreatureTagLookup, DeadLookup, DisableAutoTargetLookup, creature.AtkValue.Team, out var enemy))
+                            if (PhysicsHelper.GetNearestEnemy(entity, World, localTransform.Position, 10, CreatureTagLookup, DeadLookup, DisableAutoTargetLookup, creatureTag.TeamId, out var enemy))
                             {
                                 if (TransformLookup.TryGetComponent(enemy, out var enemyTrans))
                                 {

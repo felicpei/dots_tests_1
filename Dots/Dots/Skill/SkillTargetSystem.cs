@@ -16,10 +16,11 @@ namespace Dots
     public partial struct SkillTargetSystem : ISystem
     {
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
-        [ReadOnly] private ComponentLookup<CreatureForward> _creatureForwardLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
+        [ReadOnly] private ComponentLookup<StatusForward> _forwardLookup;
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _transformLookup;
         [ReadOnly] private ComponentLookup<DisableAutoTargetTag> _disableAutoTargetLookup;
         [ReadOnly] private BufferLookup<SummonEntities> _summonsLookup;
@@ -39,10 +40,11 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
 
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
-            _creatureForwardLookup = state.GetComponentLookup<CreatureForward>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
+            _forwardLookup = state.GetComponentLookup<StatusForward>(true);
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _transformLookup = state.GetComponentLookup<LocalToWorld>(true);
             _disableAutoTargetLookup = state.GetComponentLookup<DisableAutoTargetTag>(true);
             _summonsLookup = state.GetBufferLookup<SummonEntities>(true);
@@ -70,8 +72,9 @@ namespace Dots
             }
 
             _skillEntitiesLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
-            _creatureForwardLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _hpLookup.Update(ref state);
+            _forwardLookup.Update(ref state);
             _creatureTag.Update(ref state);
             _deadLookup.Update(ref state);
             _transformLookup.Update(ref state);
@@ -102,8 +105,9 @@ namespace Dots
                 InMonsterPause = global.InMonsterPause,
                 CollisionWorld = collisionWorld,
                 SkillEntitiesLookup = _skillEntitiesLookup,
-                CreatureLookup = _creatureLookup,
-                CreatureForwardLookup = _creatureForwardLookup,
+                SummonLookup = _summonLookup,
+                HpLookup = _hpLookup, 
+                ForwardLookup = _forwardLookup,
                 CreatureTag = _creatureTag,
                 DeadLookup = _deadLookup,
                 TransformLookup = _transformLookup,
@@ -137,11 +141,12 @@ namespace Dots
             public Entity LocalPlayerEntity;
             [ReadOnly] public CollisionWorld CollisionWorld;
             [ReadOnly] public BufferLookup<SkillEntities> SkillEntitiesLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
-            [ReadOnly] public ComponentLookup<CreatureForward> CreatureForwardLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
+            [ReadOnly] public ComponentLookup<StatusHp> HpLookup;
+            [ReadOnly] public ComponentLookup<StatusForward> ForwardLookup;
             [ReadOnly] public ComponentLookup<LocalToWorld> TransformLookup;
             [ReadOnly] public ComponentLookup<CreatureTag> CreatureTag;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<DisableAutoTargetTag> DisableAutoTargetLookup;
             [ReadOnly] public BufferLookup<SummonEntities> SummonsLookup;
             [ReadOnly] public ComponentLookup<MonsterProperties> MonsterLookup;
@@ -160,14 +165,12 @@ namespace Dots
                     return;
                 }
 
-                if (!CreatureLookup.TryGetComponent(master.Value, out var masterCreature))
+                if (CreatureTag.TryGetComponent(master.Value, out var masterTag))
                 {
-                    return;
-                }
-
-                if (InMonsterPause && masterCreature.AtkValue.Team == ETeamId.Monster)
-                {
-                    return;
+                    if (InMonsterPause && masterTag.TeamId == ETeamId.Monster)
+                    {
+                        return;
+                    }
                 }
 
                 var startInfo = properties.ValueRO.StartInfo;
@@ -206,7 +209,7 @@ namespace Dots
                     {
                         castCount = config.CastCount * properties.ValueRO.CurrLayer;
 
-                        var addValue = BuffHelper.GetBuffAddValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillCastCount, config.ClassId, config.Id);
+                        var addValue = BuffHelper.GetBuffAddValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillCastCount, config.ClassId, config.Id);
                         castCount += (int)addValue;
                     }
 
@@ -231,8 +234,17 @@ namespace Dots
                             {
                                 var monsterId = targetConfig.Param1.ToInt();
                                 var bFindParent = targetConfig.Param2.ToInt() == 1;
-                                var findEntity = bFindParent ? masterCreature.SummonParent : master.Value;
                                 var selfBackDist = targetConfig.Param3;
+                                
+                                
+                                var findEntity = master.Value;
+                                if (bFindParent)
+                                {
+                                    if (SummonLookup.TryGetComponent(master.Value, out var masterSummon))
+                                    {
+                                        findEntity = masterSummon.SummonParent;
+                                    }
+                                }
 
                                 //遍历唤物
                                 if (SummonsLookup.TryGetBuffer(findEntity, out var summonList))
@@ -413,7 +425,8 @@ namespace Dots
                                 var centerPos = startPos;
                                 if (useMasterCenter)
                                 {
-                                    if (TransformLookup.TryGetComponent(masterCreature.SummonParent, out var parentTrans))
+                                    if (SummonLookup.TryGetComponent(master.Value, out var masterSummon) &&
+                                        TransformLookup.TryGetComponent(masterSummon.SummonParent, out var parentTrans))
                                     {
                                         centerPos = parentTrans.Position;
                                     }
@@ -441,7 +454,7 @@ namespace Dots
                                 var useMasterCenter = targetConfig.Param2.ToInt() == 1;
 
                                 var targetEntity = GetNearEnemy(master.Value, config, properties.ValueRO, CollisionWorld, startPos, maxDist, useMasterCenter,
-                                    CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, TransformLookup, CreatureTag, DeadLookup, DisableAutoTargetLookup);
+                                    SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, TransformLookup, CreatureTag, DeadLookup, DisableAutoTargetLookup);
 
                                 if (TransformLookup.TryGetComponent(targetEntity, out var targetTrans))
                                 {
@@ -460,7 +473,7 @@ namespace Dots
                                 var count = targetConfig.Param4.ToInt();
                                 if (count <= 0) count = 1;
 
-                                var addValue = BuffHelper.GetBuffAddValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillTargetCount, config.ClassId, config.Id);
+                                var addValue = BuffHelper.GetBuffAddValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillTargetCount, config.ClassId, config.Id);
                                 count += (int)addValue;
 
                                 //找到目标了
@@ -535,7 +548,8 @@ namespace Dots
                                 var centerPos = startPos;
                                 if (useMasterCenter)
                                 {
-                                    if (TransformLookup.TryGetComponent(masterCreature.SummonParent, out var parentTrans))
+                                    if (SummonLookup.TryGetComponent(master.Value, out var masterSummon) &&
+                                        TransformLookup.TryGetComponent(masterSummon.SummonParent, out var parentTrans))
                                     {
                                         centerPos = parentTrans.Position;
                                     }
@@ -662,8 +676,12 @@ namespace Dots
                                     max = 0.01f;
                                 }
 
-                                var targetEntity = GetMaxMinHpEnemy(targetConfig.Method == ESkillTarget.MaxHpEnemy, master.Value, config, properties.ValueRO, CollisionWorld, startPos, min, max, useMasterCenter, CreatureLookup, BuffEntitiesLookup, BuffTagLookup,
-                                    BuffCommonLookup, TransformLookup, CreatureTag, DeadLookup, DisableAutoTargetLookup, random);
+                                var targetEntity = GetMaxMinHpEnemy(targetConfig.Method == ESkillTarget.MaxHpEnemy,
+                                    master.Value, config, properties.ValueRO, 
+                                    CollisionWorld, startPos, min, max, useMasterCenter, 
+                                    SummonLookup, HpLookup, BuffEntitiesLookup, BuffTagLookup,
+                                    BuffCommonLookup, TransformLookup, CreatureTag,
+                                    DeadLookup, DisableAutoTargetLookup, random);
 
                                 if (TransformLookup.TryGetComponent(targetEntity, out var targetTransform))
                                 {
@@ -772,14 +790,14 @@ namespace Dots
                                     max = min;
                                 }
 
-                                if (CreatureForwardLookup.TryGetComponent(master.Value, out var masterForward))
+                                if (ForwardLookup.TryGetComponent(master.Value, out var masterForward))
                                 {
                                     if (totalCount <= 0)
                                     {
                                         totalCount = 1;
                                     }
 
-                                    var addValue = BuffHelper.GetBuffAddValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillTargetCount, config.ClassId, config.Id);
+                                    var addValue = BuffHelper.GetBuffAddValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillTargetCount, config.ClassId, config.Id);
                                     totalCount += (int)addValue;
 
 
@@ -880,7 +898,7 @@ namespace Dots
                                     max = 0.01f;
                                 }
 
-                                if (CreatureForwardLookup.TryGetComponent(master.Value, out var masterForward))
+                                if (ForwardLookup.TryGetComponent(master.Value, out var masterForward))
                                 {
                                     var randomDist = random.ValueRW.Value.NextFloat(min, max);
                                     var forward = targetConfig.Method == ESkillTarget.SelfMoveForward ? masterForward.MoveForward : masterForward.FaceForward;
@@ -1012,9 +1030,10 @@ namespace Dots
                             //召唤物的master
                             case ESkillTarget.SummonMaster:
                             {
-                                if (TransformLookup.TryGetComponent(masterCreature.SummonParent, out var summonParentTrans))
+                                if (SummonLookup.TryGetComponent(master.Value, out var masterSummon) && 
+                                    TransformLookup.TryGetComponent(masterSummon.SummonParent, out var summonParentTrans))
                                 {
-                                    Ecb.AppendToBuffer(sortKey, entity, new SkillTargetBuffer(startPos, summonParentTrans.Position, masterCreature.SummonParent, createTime));
+                                    Ecb.AppendToBuffer(sortKey, entity, new SkillTargetBuffer(startPos, summonParentTrans.Position, masterSummon.SummonParent, createTime));
                                     Ecb.SetComponentEnabled<SkillTargetBuffer>(sortKey, entity, true);
                                 }
 
@@ -1032,7 +1051,7 @@ namespace Dots
                                 if (count <= 0) count = 1;
                                 if (maxDist < minDist) maxDist = minDist;
 
-                                var addValue = BuffHelper.GetBuffAddValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillTargetCount, config.ClassId, config.Id);
+                                var addValue = BuffHelper.GetBuffAddValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillTargetCount, config.ClassId, config.Id);
                                 count += (int)addValue;
 
                                 var bValid = false;
@@ -1050,7 +1069,19 @@ namespace Dots
                                 }
                                 else
                                 {
-                                    var targetEntity = targetConfig.Method == ESkillTarget.SummonMasterCircle ? masterCreature.SummonParent : master.Value;
+                                    var targetEntity = Entity.Null;
+                                    if (targetConfig.Method == ESkillTarget.SummonMasterCircle)
+                                    {
+                                        if (SummonLookup.TryGetComponent(master.Value, out var summonMaster))
+                                        {
+                                            targetEntity = summonMaster.SummonParent;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        targetEntity = master.Value;
+                                    }
+                                    
                                     if (TransformLookup.TryGetComponent(targetEntity, out var entityTrans))
                                     {
                                         bValid = true;
@@ -1101,11 +1132,11 @@ namespace Dots
                                 var min = targetConfig.Param1;
                                 var max = targetConfig.Param2;
 
-                                if (CreatureForwardLookup.TryGetComponent(master.Value, out var masterForward))
+                                if (ForwardLookup.TryGetComponent(master.Value, out var masterForward))
                                 {
                                     if (MonsterTargetLookup.TryGetComponent(master.Value, out var monsterTarget))
                                     {
-                                        if (TransformLookup.TryGetComponent(monsterTarget.HatredEnemy, out var hatredTrans) && CreatureLookup.TryGetComponent(monsterTarget.HatredEnemy, out var hatredCreature))
+                                        if (TransformLookup.TryGetComponent(monsterTarget.HatredEnemy, out var hatredTrans) && SummonLookup.TryGetComponent(monsterTarget.HatredEnemy, out var hatredCreature))
                                         {
                                             var targetPos = hatredTrans.Position;
                                             targetPos += -masterForward.MoveForward * random.ValueRW.Value.NextFloat(min, max);
@@ -1164,13 +1195,13 @@ namespace Dots
             }
 
             private static Entity GetNearEnemy(Entity master, SkillConfig config, SkillProperties properties, CollisionWorld collisionWorld, float3 startPos, float max, bool useMasterCenter,
-                ComponentLookup<CreatureProperties> creatureLookup, BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
-                ComponentLookup<LocalToWorld> transformLookup, ComponentLookup<CreatureTag> creatureTag, ComponentLookup<InDeadTag> deadLookup, ComponentLookup<DisableAutoTargetTag> disableAutoTargetLookup)
+                ComponentLookup<StatusSummon> summonLookup, BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
+                ComponentLookup<LocalToWorld> transformLookup, ComponentLookup<CreatureTag> creatureTag, ComponentLookup<InDeadState> deadLookup, ComponentLookup<DisableAutoTargetTag> disableAutoTargetLookup)
             {
                 var centerPos = startPos;
                 if (useMasterCenter)
                 {
-                    if (creatureLookup.TryGetComponent(master, out var masterCreature))
+                    if (summonLookup.TryGetComponent(master, out var masterCreature))
                     {
                         if (transformLookup.TryGetComponent(masterCreature.SummonParent, out var parentTrans))
                         {
@@ -1189,14 +1220,23 @@ namespace Dots
             }
 
 
-            private static Entity GetMaxMinHpEnemy(bool isMaxHp, Entity master, SkillConfig config, SkillProperties properties, CollisionWorld collisionWorld, float3 startPos, float min, float max, bool useMasterCenter,
-                ComponentLookup<CreatureProperties> creatureLookup, BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
-                ComponentLookup<LocalToWorld> transformLookup, ComponentLookup<CreatureTag> creatureTag, ComponentLookup<InDeadTag> deadLookup, ComponentLookup<DisableAutoTargetTag> disableAutoTargetLookup, RefRW<RandomSeed> random)
+            private static Entity GetMaxMinHpEnemy(bool isMaxHp, Entity master, SkillConfig config, SkillProperties properties, 
+                CollisionWorld collisionWorld, float3 startPos, float min, float max, bool useMasterCenter,
+                ComponentLookup<StatusSummon> summonLookup, 
+                ComponentLookup<StatusHp> hpLookup, 
+                BufferLookup<BuffEntities> buffEntitiesLookup, 
+                ComponentLookup<BuffTag> buffTagLookup, 
+                ComponentLookup<BuffCommonData> buffCommonLookup,
+                ComponentLookup<LocalToWorld> transformLookup, 
+                ComponentLookup<CreatureTag> creatureTag,
+                ComponentLookup<InDeadState> deadLookup,
+                ComponentLookup<DisableAutoTargetTag> disableAutoTargetLookup,
+                RefRW<RandomSeed> random)
             {
                 var centerPos = startPos;
                 if (useMasterCenter)
                 {
-                    if (creatureLookup.TryGetComponent(master, out var masterCreature))
+                    if (summonLookup.TryGetComponent(master, out var masterCreature))
                     {
                         if (transformLookup.TryGetComponent(masterCreature.SummonParent, out var parentTrans))
                         {
@@ -1227,30 +1267,30 @@ namespace Dots
                     var enemyPos = transformLookup.GetRefRO(enemy).ValueRO.Position;
                     if (math.distancesq(enemyPos, centerPos) > min * min)
                     {
-                        if (creatureLookup.TryGetComponent(enemy, out var enemyCreature))
+                        if (hpLookup.TryGetComponent(enemy, out var enemyHp))
                         {
                             if (isMaxHp)
                             {
-                                if (enemyCreature.CurHp > maxHpFlag)
+                                if (enemyHp.CurHp > maxHpFlag)
                                 {
-                                    maxHpFlag = enemyCreature.CurHp;
+                                    maxHpFlag = enemyHp.CurHp;
                                     randomEnemies.Clear();
                                     randomEnemies.Add(enemy);
                                 }
-                                else if (Mathf.Approximately(enemyCreature.CurHp, minHpFlag))
+                                else if (Mathf.Approximately(enemyHp.CurHp, minHpFlag))
                                 {
                                     randomEnemies.Add(enemy);
                                 }
                             }
                             else
                             {
-                                if (enemyCreature.CurHp < minHpFlag)
+                                if (enemyHp.CurHp < minHpFlag)
                                 {
-                                    minHpFlag = enemyCreature.CurHp;
+                                    minHpFlag = enemyHp.CurHp;
                                     randomEnemies.Clear();
                                     randomEnemies.Add(enemy);
                                 }
-                                else if (Mathf.Approximately(enemyCreature.CurHp, minHpFlag))
+                                else if (Mathf.Approximately(enemyHp.CurHp, minHpFlag))
                                 {
                                     randomEnemies.Add(enemy);
                                 }

@@ -16,12 +16,13 @@ namespace Dots
     public partial struct BulletBehaviourActionSystem : ISystem
     {
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _transformLookup;
         [ReadOnly] private ComponentLookup<BulletBombTag> _bombLookup;
         [ReadOnly] private ComponentLookup<BulletDestroyTag> _destroyLookup;
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<StatusCenter> _centerLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
@@ -42,10 +43,11 @@ namespace Dots
             _bombLookup = state.GetComponentLookup<BulletBombTag>(true);
             _destroyLookup = state.GetComponentLookup<BulletDestroyTag>(true);
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _transformLookup = state.GetComponentLookup<LocalToWorld>(true);
             _cacheLookup = state.GetComponentLookup<CacheProperties>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _centerLookup = state.GetComponentLookup<StatusCenter>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
@@ -76,7 +78,8 @@ namespace Dots
             _deadLookup.Update(ref state);
             _transformLookup.Update(ref state);
             _cacheLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _centerLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
@@ -102,7 +105,8 @@ namespace Dots
                 CreatureTag = _creatureTag,
                 DeadLookup = _deadLookup,
                 CacheLookup = _cacheLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
+                CenterLookup = _centerLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
                 BuffTagLookup = _buffTagLookup,
                 BuffCommonLookup = _buffCommonLookup,
@@ -128,9 +132,10 @@ namespace Dots
             [ReadOnly] public CollisionWorld CollisionWorld;
             [ReadOnly] public ComponentLookup<LocalToWorld> TransformLookup;
             [ReadOnly] public ComponentLookup<CreatureTag> CreatureTag;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
+            [ReadOnly] public ComponentLookup<StatusCenter> CenterLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
@@ -270,13 +275,13 @@ namespace Dots
                                     properties.ValueRO.Team, out var nearest, bulletConfig.HitSameTeam))
                             {
                                 if (TransformLookup.TryGetComponent(nearest, out var enemyTrans) &&
-                                    CreatureLookup.TryGetComponent(nearest, out var enemyCreature))
+                                    CenterLookup.TryGetComponent(nearest, out var enemyCenter))
                                 {
                                     //强制结束环绕
                                     properties.ValueRW.AroundPos = float3.zero;
                                     properties.ValueRW.AroundEntity = Entity.Null;
 
-                                    var enemyPos = CreatureHelper.getCenterPos(enemyTrans.Position, enemyCreature, enemyTrans.Value.Scale().x);
+                                    var enemyPos = CreatureHelper.GetCenterPos(enemyTrans.Position, enemyCenter, enemyTrans.Value.Scale().x);
                                     var direction = math.normalizesafe(enemyPos - localTransform.ValueRO.Position);
                                     properties.ValueRW.D1 = direction;
 
@@ -518,11 +523,11 @@ namespace Dots
                             var findParent = config.Param4.ToInt() == 1;
 
                             var findEntity = properties.ValueRO.MasterCreature;
-                            if (CreatureLookup.TryGetComponent(properties.ValueRO.MasterCreature, out var masterCreature))
+                            if (SummonLookup.TryGetComponent(properties.ValueRO.MasterCreature, out var masterSummon))
                             {
                                 if (findParent)
                                 {
-                                    findEntity = masterCreature.SummonParent;
+                                    findEntity = masterSummon.SummonParent;
                                 }
                             }
 
@@ -818,7 +823,7 @@ namespace Dots
                             }
                             else
                             {
-                                contTime = BuffHelper.CalcContTime(contTime, properties.ValueRO.MasterCreature, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);    
+                                contTime = BuffHelper.CalcContTime(contTime, properties.ValueRO.MasterCreature, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);    
                             }
 
                             var enemies = PhysicsHelper.OverlapEnemies(properties.ValueRO.MasterCreature, CollisionWorld, 

@@ -10,8 +10,8 @@ namespace Dots
     [UpdateInGroup(typeof(GlobalSystemGroup))]
     public partial struct FactorySkillSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _localToWorldLookup;
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private ComponentLookup<SkillProperties> _skillPropertiesLookup;
@@ -26,8 +26,8 @@ namespace Dots
             state.RequireForUpdate<LocalPlayerTag>();
             state.RequireForUpdate<CacheProperties>();
             
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _localToWorldLookup = state.GetComponentLookup<LocalToWorld>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _skillPropertiesLookup = state.GetComponentLookup<SkillProperties>(true);
@@ -44,7 +44,7 @@ namespace Dots
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _deadLookup.Update(ref state);
             _skillEntitiesLookup.Update(ref state);
             _skillPropertiesLookup.Update(ref state);
@@ -66,9 +66,9 @@ namespace Dots
                 global.CreateSkillBuffer.RemoveAt(0);
 
                 var bAlive = _deadLookup.HasComponent(buffer.Master) && !_deadLookup.IsComponentEnabled(buffer.Master);
-                if (bAlive && _creatureLookup.HasComponent(buffer.Master))
+                if (bAlive && _summonLookup.HasComponent(buffer.Master))
                 {
-                    SkillHelper.CreateSkill(deltaTime, global, cache, buffer, ecb, _creatureLookup, _skillEntitiesLookup, _skillPropertiesLookup, _localToWorldLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
+                    SkillHelper.CreateSkill(deltaTime, global, cache, buffer, ecb, _summonLookup, _skillEntitiesLookup, _skillPropertiesLookup, _localToWorldLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
                 }
             }
             

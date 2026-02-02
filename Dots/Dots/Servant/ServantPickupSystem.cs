@@ -13,13 +13,15 @@ namespace Dots
     [UpdateAfter(typeof(PlayerDeadSystem))]
     public partial struct ServantPickupSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<CreatureProps> _propsLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
         [ReadOnly] private BufferLookup<ServantList> _servantListLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
@@ -30,13 +32,15 @@ namespace Dots
             state.RequireForUpdate<GlobalInitialized>();
             state.RequireForUpdate<LocalPlayerTag>();
             
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _propsLookup =  state.GetComponentLookup<CreatureProps>(true);
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
             _servantListLookup = state.GetBufferLookup<ServantList>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
@@ -64,19 +68,19 @@ namespace Dots
             _buffCommonLookup.Update(ref state);
             _deadLookup.Update(ref state);
             _skillTagLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _propsLookup.Update(ref state);
+            _hpLookup.Update(ref state);
             _servantListLookup.Update(ref state);
             _attrLookup.Update(ref state);
             _attrModifyLookup.Update(ref state);
 
             var localPlayer = SystemAPI.GetSingletonEntity<LocalPlayerTag>();
-            var localCreature = SystemAPI.GetComponentRO<CreatureProperties>(localPlayer);
             
             //拾取 
             new PlayerPickupJob
             {
                 Ecb = ecb.AsParallelWriter(),
-                LocalCreature= localCreature.ValueRO,
                 GlobalEntity = global.Entity,
                 LocalPlayer = localPlayer,
                 SkillEntitiesLookup = _skillEntitiesLookup,
@@ -85,7 +89,9 @@ namespace Dots
                 BuffTagLookup = _buffTagLookup,
                 BuffCommonLookup = _buffCommonLookup,
                 SkillTagLookup = _skillTagLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
+                PropsLookup = _propsLookup,
+                HpLookup = _hpLookup,
                 ServantListLookup = _servantListLookup,
                 AttrLookup = _attrLookup,
                 AttrModifyLookup = _attrModifyLookup,
@@ -102,22 +108,26 @@ namespace Dots
             public EntityCommandBuffer.ParallelWriter Ecb;
             public Entity GlobalEntity;
             public Entity LocalPlayer;
-
-            [ReadOnly] public CreatureProperties LocalCreature;
             
             [ReadOnly] public BufferLookup<SkillEntities> SkillEntitiesLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<SkillTag> SkillTagLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
+            [ReadOnly] public ComponentLookup<StatusHp> HpLookup;
             [ReadOnly] public BufferLookup<ServantList> ServantListLookup;
             [ReadOnly] public ComponentLookup<PlayerAttrData> AttrLookup;
             [ReadOnly] public BufferLookup<PlayerAttrModify> AttrModifyLookup;
+            [ReadOnly] public ComponentLookup<CreatureProps> PropsLookup;
             
             [BurstCompile]
-            private void Execute(MainServantTag mainServant, DynamicBuffer<PickupBuffer> buffer, LocalTransform localTransform, Entity servantEntity, [EntityIndexInQuery] int sortKey)
+            private void Execute(MainServantTag mainServant, 
+                DynamicBuffer<PickupBuffer> buffer,
+                LocalTransform localTransform,
+                Entity servantEntity, 
+                [EntityIndexInQuery] int sortKey)
             {
                 if (DeadLookup.IsComponentEnabled(servantEntity))
                 {
@@ -157,11 +167,14 @@ namespace Dots
                             totalAddHpFactor += addPercent;
 
                             //SkillTrigger
-                            var playerMaxHp = AttrHelper.GetMaxHp(LocalPlayer, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
-                            SkillHelper.DoSkillTrigger(LocalPlayer, SkillEntitiesLookup, SkillTagLookup, new SkillTriggerData(ESkillTrigger.OnPickupHp)
+                            if (HpLookup.TryGetComponent(LocalPlayer, out var localPlayerHp))
                             {
-                                FloatValue1 = LocalCreature.CurHp / playerMaxHp,
-                            }, Ecb, sortKey);
+                                var playerMaxHp = AttrHelper.GetMaxHp(LocalPlayer, AttrLookup, AttrModifyLookup, HpLookup, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                                SkillHelper.DoSkillTrigger(LocalPlayer, SkillEntitiesLookup, SkillTagLookup, new SkillTriggerData(ESkillTrigger.OnPickupHp)
+                                {
+                                    FloatValue1 = localPlayerHp.CurHp / playerMaxHp,
+                                }, Ecb, sortKey);
+                            }
                             break;
                         }
                         case EDropItemAction.AddGold:
@@ -230,7 +243,10 @@ namespace Dots
                             if (skillId > 0)
                             {
                                 //装备上技能
-                                SkillHelper.AddSkill(GlobalEntity, LocalPlayer, skillId, LocalCreature.AtkValue, localTransform.Position, Ecb, sortKey);
+                                if (PropsLookup.TryGetComponent(LocalPlayer, out var localPlayerProps))
+                                {
+                                    SkillHelper.AddSkill(GlobalEntity, LocalPlayer, skillId, localPlayerProps.AtkValue, localTransform.Position, Ecb, sortKey);    
+                                }
 
                                 //加tag恢复
                                 if (contTime > 0)

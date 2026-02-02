@@ -1,6 +1,4 @@
 ﻿using Dots;
-using Dots;
-using Dots;
 using Unity.Entities;
 using Color = UnityEngine.Color;
 

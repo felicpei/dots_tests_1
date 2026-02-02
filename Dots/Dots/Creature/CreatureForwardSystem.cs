@@ -45,10 +45,10 @@ namespace Dots
             public float DeltaTime;
 
             [BurstCompile]
-            private void Execute(RefRW<LocalTransform> localTransform, CreatureProperties creature, RefRW<CreatureForward> tag, Entity entity)
+            private void Execute(RefRW<LocalTransform> localTransform, CreatureTag creatureTag, RefRW<StatusForward> tag, Entity entity)
             {
                 //15fps立即转
-                if (creature.Type == ECreatureType.Player || DeltaTime > 0.066f)
+                if (creatureTag.Type == ECreatureType.Player || DeltaTime > 0.066f)
                 {
                     localTransform.ValueRW.Rotation = MathHelper.forward2RotationSafe(tag.ValueRO.FaceForward);
                 }

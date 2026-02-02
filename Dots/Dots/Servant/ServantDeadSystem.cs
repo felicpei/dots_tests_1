@@ -12,7 +12,7 @@ namespace Dots
     [UpdateInGroup(typeof(PlayerSystemGroup))]
     public partial struct ServantDeadSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
         [ReadOnly] private ComponentLookup<ServantProperties> _servantLookup;
@@ -32,7 +32,7 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
             state.RequireForUpdate<LocalPlayerTag>();
             
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
             _mainServantLookup = state.GetComponentLookup<MainServantTag>(true);
@@ -74,8 +74,9 @@ namespace Dots
             _transformLookup.Update(ref state);
             _eventPlayAnimation.Update(ref state);
             
-            var playerAspect = SystemAPI.GetAspect<PlayerAspect>(SystemAPI.GetSingletonEntity<LocalPlayerTag>());
-            var ecb = new EntityCommandBuffer(Allocator.TempJob);
+            var ecb = new EntityCommandBuffer(Allocator.Temp);
+            var localPlayer = SystemAPI.GetSingletonEntity<LocalPlayerTag>();
+            var servantList = SystemAPI.GetBuffer<ServantList>(localPlayer);
             
             foreach (var (tag, servant, entity) in SystemAPI.Query<EnterDieTag, ServantProperties>().WithEntityAccess())
             {
@@ -86,10 +87,10 @@ namespace Dots
                 
                 //死亡标志
                 ecb.SetComponentEnabled<EnterDieTag>(entity, false);
-                ecb.SetComponentEnabled<InDeadTag>(entity, true);
+                ecb.SetComponentEnabled<InDeadState>(entity, true);
 
                 //ui event
-                ecb.AppendToBuffer(playerAspect.Entity, new UIUpdateBuffer
+                ecb.AppendToBuffer(localPlayer, new UIUpdateBuffer
                 { 
                     Value = new EventData
                     {
@@ -104,13 +105,13 @@ namespace Dots
                     ecb.SetComponentEnabled<HybridEvent_PlayAnimation>(entity, true);
                 }
                  
-                CreatureHelper.UnbindServant(playerAspect, global, entity, _transformLookup, _servantLookup, _mainServantLookup,
+                CreatureHelper.UnbindServant(servantList, global, entity, _transformLookup, _servantLookup, _mainServantLookup,
                     _childLookup, _effectLookup,  _bindingBulletLookup,_bulletLookup, ecb, 3f);
 
                 //全部死亡了
-                if (playerAspect.Servants.Length <= 0)
+                if (servantList.Length <= 0)
                 {
-                    ecb.AppendToBuffer(playerAspect.Entity, new UIUpdateBuffer
+                    ecb.AppendToBuffer(localPlayer, new UIUpdateBuffer
                     {
                         Value = new EventData
                         {

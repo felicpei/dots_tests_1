@@ -157,7 +157,7 @@ namespace Dots
         public float ScaleFactor;
     }
     
-    [InternalBufferCapacity(2)] 
+    [InternalBufferCapacity(4)] 
     public struct BulletTriggerBuffer : IBufferElementData, IEnableableComponent
     {
         public EBulletBehaviourTrigger Type;
@@ -165,7 +165,7 @@ namespace Dots
         public float FlyDist;
     }
     
-    [InternalBufferCapacity(2)] 
+    [InternalBufferCapacity(4)] 
     public struct BulletBehaviourBuffer :  IBufferElementData, IEnableableComponent
     {
         public int Id;
@@ -179,7 +179,7 @@ namespace Dots
         public float Timer;
     }
     
-    [InternalBufferCapacity(2)] 
+    [InternalBufferCapacity(4)] 
     public struct BulletActionBuffer : IBufferElementData, IEnableableComponent
     {
         public int BehaviourId;

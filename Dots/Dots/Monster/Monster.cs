@@ -2,8 +2,6 @@
     using Unity.Entities;
     using Unity.Mathematics;
 
-
-
     namespace Dots
     {
         public struct MonsterProperties : IComponentData
@@ -56,7 +54,7 @@
         {
         }
         
-        [InternalBufferCapacity(2)]
+        [InternalBufferCapacity(4)]
         public struct MonsterDropInfo : IBufferElementData
         {
             public bool IsExp;

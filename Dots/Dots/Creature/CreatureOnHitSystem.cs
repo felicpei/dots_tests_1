@@ -13,14 +13,17 @@ namespace Dots
     [UpdateInGroup(typeof(CreatureSystemGroup))]
     public partial struct CreatureOnHitSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
-        [ReadOnly] private ComponentLookup<CreatureMove> _creatureMoveLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
+        [ReadOnly] private ComponentLookup<CreatureProps> _propsLookup;
+        [ReadOnly] private ComponentLookup<CreatureTag> _creatureTagLookup;
+        [ReadOnly] private ComponentLookup<StatusMove> _creatureMoveLookup;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
         [ReadOnly] private ComponentLookup<DisableHurtTag> _disableHurtLookup;
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
         [ReadOnly] private ComponentLookup<EnterDieTag> _enterDieLookup;
-        [ReadOnly] private ComponentLookup<InDeadTag> _inDeadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _inDeadLookup;
         [ReadOnly] private ComponentLookup<LocalPlayerTag> _localPlayerLookup;
         [ReadOnly] private BufferLookup<SummonEntities> _summonEntitiesLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
@@ -40,13 +43,16 @@ namespace Dots
             state.RequireForUpdate<LocalPlayerTag>();
             state.RequireForUpdate<CacheProperties>();
 
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
-            _creatureMoveLookup = state.GetComponentLookup<CreatureMove>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
+            _propsLookup = state.GetComponentLookup<CreatureProps>(true);
+            _creatureTagLookup = state.GetComponentLookup<CreatureTag>(true);
+            _creatureMoveLookup = state.GetComponentLookup<StatusMove>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
             _disableHurtLookup = state.GetComponentLookup<DisableHurtTag>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _enterDieLookup = state.GetComponentLookup<EnterDieTag>(true);
-            _inDeadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _inDeadLookup = state.GetComponentLookup<InDeadState>(true);
             _localPlayerLookup = state.GetComponentLookup<LocalPlayerTag>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
@@ -76,7 +82,10 @@ namespace Dots
                 return;
             }
 
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _hpLookup.Update(ref state);
+            _propsLookup.Update(ref state);
+            _creatureTagLookup.Update(ref state);
             _creatureMoveLookup.Update(ref state);
             _transformLookup.Update(ref state);
             _disableHurtLookup.Update(ref state);
@@ -99,8 +108,8 @@ namespace Dots
             var ecb = new EntityCommandBuffer(Allocator.Temp);
             var cache = SystemAPI.GetAspect<CacheAspect>(SystemAPI.GetSingletonEntity<CacheProperties>());
 
-            foreach (var (damageBuffers, creature, creatureElement, entity)
-                     in SystemAPI.Query<DynamicBuffer<DamageBuffer>, RefRW<CreatureProperties>, RefRW<BindingElement>>().WithEntityAccess())
+            foreach (var (damageBuffers, hpInfo, creatureTag, center, creatureElement, entity)
+                     in SystemAPI.Query<DynamicBuffer<DamageBuffer>, RefRW<StatusHp>, CreatureTag, StatusCenter, RefRW<BindingElement>>().WithEntityAccess())
             {
                 //已销毁或死亡的不处理
                 if (!_transformLookup.TryGetComponent(entity, out var localTransform) || _enterDieLookup.IsComponentEnabled(entity) || _inDeadLookup.IsComponentEnabled(entity))
@@ -116,7 +125,8 @@ namespace Dots
                     damageBuffers.RemoveAt(j);
 
                     //如果无敌，则不处理伤害
-                    if (_disableHurtLookup.IsComponentEnabled(entity) || BuffHelper.GetHasBuff(entity, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.Invincible))
+                    if (_disableHurtLookup.IsComponentEnabled(entity) || 
+                        BuffHelper.GetHasBuff(entity, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.Invincible))
                     {
                         continue;
                     }
@@ -136,7 +146,7 @@ namespace Dots
                     }
 
                     //被击方闪避处理
-                    if (bulletProperties.From != EBulletFrom.Buff && ProcessDodge(entity, _creatureLookup, global, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, _attrLookup, _attrModifyLookup, ecb))
+                    if (bulletProperties.From != EBulletFrom.Buff && ProcessDodge(entity, _summonLookup, global, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, _attrLookup, _attrModifyLookup, ecb))
                     {
                         SkillHelper.DoSkillTrigger(entity, _skillEntitiesLookup, _skillTagLookup, new SkillTriggerData(ESkillTrigger.OnDodge), ecb);
                         continue;
@@ -145,19 +155,22 @@ namespace Dots
                     var attacker = bulletProperties.MasterCreature;
                     var damageCalc = bulletConfig.DamageCalc;
                     var attackerElementId = bulletProperties.ElementId;
-                    var hitMaxHp = AttrHelper.GetMaxHp(entity, _attrLookup, _attrModifyLookup, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
-                    var beforeHpPercent = creature.ValueRO.CurHp / hitMaxHp;
+                    var hitMaxHp = AttrHelper.GetMaxHp(entity, _attrLookup, _attrModifyLookup, _hpLookup, _summonLookup,  _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
+                    var beforeHpPercent = hpInfo.ValueRO.CurHp / hitMaxHp;
                     
                     //计算初始伤害
-                    var sourceDamage = DamageHelper.CalcDamage(bulletProperties, entity, attacker, damageCalc, buffer.DamageFactor, bulletAtk.Atk, global, cache,
-                        _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, _creatureLookup, _creatureMoveLookup, _shieldLookup, _attrLookup, _attrModifyLookup, out var canCrit);
+                    var sourceDamage = DamageHelper.CalcDamage(bulletProperties, entity, attacker, damageCalc,
+                        buffer.DamageFactor, bulletAtk.Atk, global, cache,
+                        _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, 
+                        _hpLookup, _propsLookup, _creatureTagLookup,
+                        _summonLookup, _creatureMoveLookup, _shieldLookup, _attrLookup, _attrModifyLookup, out var canCrit);
 
                     var damage = sourceDamage;
                     var damageNumberType = EDamageNumber.None;
                     EAgainstType againstType;
 
                     //元素克制伤害处理
-                    var elementFactor = cache.GetAgainstFactor(attackerElementId, creature.ValueRO.BelongElementId);
+                    var elementFactor = cache.GetAgainstFactor(attackerElementId, creatureTag.BelongElementId);
                     if (elementFactor > 1f)
                     {
                         againstType = EAgainstType.Weak;
@@ -172,7 +185,7 @@ namespace Dots
                     }
 
                     //buff 元素抗性 %
-                    var elementHurtFactor = BuffHelper.GetBuffAddFactor(entity, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.ElementHurt, (int)creature.ValueRO.BelongElementId);
+                    var elementHurtFactor = BuffHelper.GetBuffAddFactor(entity, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.ElementHurt, (int)creatureTag.BelongElementId);
                     elementFactor += elementHurtFactor;
 
                     damage *= elementFactor;
@@ -215,7 +228,7 @@ namespace Dots
                                         From = EBulletFrom.ElementReaction,
                                         FromId = (int)reaction,
                                         BulletId = (int)EElementBulletId.Overloaded,
-                                        ShootPos = CreatureHelper.getCenterPos(localTransform.Position, creature.ValueRO, localTransform.Scale),
+                                        ShootPos = CreatureHelper.GetCenterPos(localTransform.Position, center, localTransform.Scale),
                                         ParentCreature = attacker,
                                         AtkValue = new AtkValue(bulletAtk.Atk, bulletAtk.Crit, bulletAtk.CritDamage, bulletProperties.Team),
                                         ImmediatelyBomb = true,
@@ -251,7 +264,7 @@ namespace Dots
                                         From = EBulletFrom.ElementReaction,
                                         FromId = (int)reaction,
                                         BulletId = (int)EElementBulletId.Superconduct,
-                                        ShootPos = CreatureHelper.getCenterPos(localTransform.Position, creature.ValueRO, localTransform.Scale),
+                                        ShootPos = CreatureHelper.GetCenterPos(localTransform.Position, center, localTransform.Scale),
                                         ParentCreature = attacker,
                                         AtkValue = new AtkValue(bulletAtk.Atk, bulletAtk.Crit, bulletAtk.CritDamage, bulletProperties.Team),
                                         ImmediatelyBomb = true,
@@ -281,7 +294,7 @@ namespace Dots
 
 
                         //先检查fatalHit
-                        var buffResult = BuffHelper.GetBuffFactorAndValue(attacker, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.FatalHit, checkFloat: beforeHpPercent);
+                        var buffResult = BuffHelper.GetBuffFactorAndValue(attacker, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.FatalHit, checkFloat: beforeHpPercent);
                         if (global.Random.ValueRW.Value.NextFloat(0f, 1f) <= buffResult.TempData)
                         {
                             damageNumberType = EDamageNumber.FatalHit;
@@ -291,7 +304,8 @@ namespace Dots
 
                         if (canCrit)
                         {
-                            damage = ProcessCrit(damage, beforeHpPercent, localTransform.Position, buffer, bulletConfig, bulletAtk, attacker, creature, global, cache, _creatureLookup,
+                            damage = ProcessCrit(damage, beforeHpPercent, localTransform.Position, buffer, bulletConfig,
+                                bulletAtk, attacker, global, cache, _summonLookup, _propsLookup,
                                 _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, _skillEntitiesLookup, _skillTagLookup, _shieldLookup, _creatureMoveLookup, _attrLookup, _attrModifyLookup, ecb, out var critType);
 
                             if (critType != EDamageNumber.None)
@@ -302,17 +316,19 @@ namespace Dots
                     }
 
                     //伤害四舍五入
-                    var afterHp = creature.ValueRO.CurHp;
+                    var afterHp = hpInfo.ValueRO.CurHp;
 
                     //处理护盾
-                    var shieldHurtValue = ProcessShield(entity, creature, _shieldLookup, damage, ecb);
+                    var shieldHurtValue = ProcessShield(entity, _shieldLookup, damage, ecb);
                     var bHitShield = shieldHurtValue > 0;
                     if (!bHitShield)
                     {
                         //处理斩杀
-                        if (BuffHelper.CheckExecutionBuff(attacker, damage, global, entity, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, _attrLookup, _attrModifyLookup, out var effectId))
+                        if (BuffHelper.CheckExecutionBuff(attacker, damage, global, entity,
+                                _summonLookup, _hpLookup, _creatureTagLookup, _buffEntitiesLookup, _buffTagLookup,
+                                _buffCommonLookup, _attrLookup, _attrModifyLookup, out var effectId))
                         {
-                            damage = creature.ValueRO.CurHp;
+                            damage = hpInfo.ValueRO.CurHp;
 
                             //斩杀特效
                             if (effectId > 0)
@@ -326,7 +342,7 @@ namespace Dots
                             }
                         }
 
-                        afterHp = creature.ValueRO.CurHp - damage;
+                        afterHp = hpInfo.ValueRO.CurHp - damage;
                         if (afterHp < 0)
                         {
                             afterHp = 0;
@@ -341,7 +357,7 @@ namespace Dots
                             }
                         }
 
-                        creature.ValueRW.CurHp = afterHp;
+                        hpInfo.ValueRW.CurHp = afterHp;
                         var afterHpPercent = afterHp / hitMaxHp;
 
                         //技能触发器：血量变化
@@ -352,7 +368,7 @@ namespace Dots
                         }, ecb);
 
                         //查看被击者的输血buff，尝试输血给buff释放者
-                        BuffHelper.ProcessTransfusionBuff(entity, damage, _buffEntitiesLookup, _buffTagLookup, _buffTransfusion, _creatureLookup, ecb);
+                        BuffHelper.ProcessTransfusionBuff(entity, damage, _buffEntitiesLookup, _buffTagLookup, _buffTransfusion, _summonLookup, ecb);
 
                         //飘血数字
                         if (global.ShowDamageNumber)
@@ -402,16 +418,16 @@ namespace Dots
                         var findEntity = entity;
                         var servantId = 0;
                         var servantParent = Entity.Null;
-                        while (_creatureLookup.TryGetComponent(findEntity, out var attackerCreature))
+                        while (_summonLookup.TryGetComponent(findEntity, out var attackeSummon))
                         {
-                            if (attackerCreature.Type == ECreatureType.Servant)
+                            if (attackeSummon.SelfType == ECreatureType.Servant)
                             {
-                                servantId = attackerCreature.SelfConfigId;
-                                servantParent = attackerCreature.SummonParent;
+                                servantId = attackeSummon.SelfConfigId;
+                                servantParent = attackeSummon.SummonParent;
                                 break;
                             }
 
-                            if (attackerCreature.Type == ECreatureType.Player)
+                            if (attackeSummon.SelfType == ECreatureType.Player)
                             {
                                 //local player
                                 servantId = 0;
@@ -419,11 +435,11 @@ namespace Dots
                                 break;
                             }
 
-                            if (!_creatureLookup.HasComponent(attackerCreature.SummonParent))
+                            if (!_summonLookup.HasComponent(attackeSummon.SummonParent))
                             {
                                 break;
                             }
-                            findEntity = attackerCreature.SummonParent;    
+                            findEntity = attackeSummon.SummonParent;    
                         } 
                             
                         if (_localPlayerLookup.HasComponent(servantParent))
@@ -488,7 +504,7 @@ namespace Dots
                         }, ecb);
 
                         //召唤物命中敌人技能Trigger
-                        if (_creatureLookup.TryGetComponent(attacker, out var attackerCreature) && _creatureLookup.HasComponent(attackerCreature.SummonParent))
+                        if (_summonLookup.TryGetComponent(attacker, out var attackerCreature) && _summonLookup.HasComponent(attackerCreature.SummonParent))
                         {
                             SkillHelper.DoSkillTrigger(attackerCreature.SummonParent, _skillEntitiesLookup, _skillTagLookup, new SkillTriggerData(ESkillTrigger.SummonHitEnemy)
                             {
@@ -513,7 +529,7 @@ namespace Dots
                         }
 
                         //是否有免疫死亡的buff，如果有，则先不执行死亡流程
-                        var immuneDie = BuffHelper.GetHasBuff(entity, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.ImmuneDie);
+                        var immuneDie = BuffHelper.GetHasBuff(entity, _summonLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, EBuffType.ImmuneDie);
                         if (immuneDie == false)
                         {
                             //SkillTrigger 击杀
@@ -523,18 +539,18 @@ namespace Dots
                                     Entity = entity,
                                     From = bulletProperties.From,
                                     FromParam = bulletProperties.FromId,
-                                    IntValue1 = (int)creature.ValueRO.Type,
+                                    IntValue1 = (int)creatureTag.Type,
                                 }, ecb);
 
                                 //如果master是召唤物，触发master的trigger
-                                if (_creatureLookup.TryGetComponent(attacker, out var masterCreature) && _creatureLookup.HasComponent(masterCreature.SummonParent))
+                                if (_summonLookup.TryGetComponent(attacker, out var masterCreature) && _summonLookup.HasComponent(masterCreature.SummonParent))
                                 {
                                     SkillHelper.DoSkillTrigger(masterCreature.SummonParent, _skillEntitiesLookup, _skillTagLookup, new SkillTriggerData(ESkillTrigger.KillEnemy)
                                     {
                                         Entity = entity,
                                         From = bulletProperties.From,
                                         FromParam = bulletProperties.FromId,
-                                        IntValue1 = (int)creature.ValueRO.Type,
+                                        IntValue1 = (int)creatureTag.Type,
                                         BoolValue1 = true, //召唤物触发给master的
                                     }, ecb);
                                 }
@@ -583,7 +599,7 @@ namespace Dots
         }
 
 
-        private static float ProcessShield(Entity hitEntity, RefRW<CreatureProperties> creature, ComponentLookup<ShieldProperties> shieldLookup, float damageResult, EntityCommandBuffer ecb)
+        private static float ProcessShield(Entity hitEntity, ComponentLookup<ShieldProperties> shieldLookup, float damageResult, EntityCommandBuffer ecb)
         {
             var shieldHurt = 0f;
             if (shieldLookup.TryGetComponent(hitEntity, out var shield) && shieldLookup.IsComponentEnabled(hitEntity))
@@ -618,15 +634,15 @@ namespace Dots
             return shieldHurt;
         }
 
-        private static bool ProcessDodge(Entity hitEntity, ComponentLookup<CreatureProperties> creatureLookup, GlobalAspect global,
+        private static bool ProcessDodge(Entity hitEntity, ComponentLookup<StatusSummon> summonLookup, GlobalAspect global,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup, 
             ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup, EntityCommandBuffer ecb)
         {
             //buff Dodge 
-            var dodgeProb = BuffHelper.GetBuffAddFactor(hitEntity, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.Dodge);
+            var dodgeProb = BuffHelper.GetBuffAddFactor(hitEntity, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.Dodge);
             
             //attr
-            dodgeProb += AttrHelper.GetAttr(hitEntity, EAttr.Dodge, attrLookup, attrModifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+            dodgeProb += AttrHelper.GetAttr(hitEntity, EAttr.Dodge, attrLookup, attrModifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
             
             //max dodge
             var maxDodge = AttrHelper.GetMax(EAttr.Dodge, hitEntity, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
@@ -804,10 +820,11 @@ namespace Dots
             return EElementReaction.None;
         }
 
-        private static float ProcessCrit(float sourceDamage, float hpPercent, float3 hitPos, DamageBuffer buffer, BulletConfig bulletConfig, BulletAtkValue bulletAtk, Entity attacker,
-            RefRW<CreatureProperties> hitCreature, GlobalAspect global, CacheAspect cache, ComponentLookup<CreatureProperties> creatureLookup,
+        private static float ProcessCrit(float sourceDamage, float hpPercent, float3 hitPos, DamageBuffer buffer, 
+            BulletConfig bulletConfig, BulletAtkValue bulletAtk, Entity attacker,
+            GlobalAspect global, CacheAspect cache, ComponentLookup<StatusSummon> summonLookup, ComponentLookup<CreatureProps> propsLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
-            BufferLookup<SkillEntities> skillEntitiesLookup, ComponentLookup<SkillTag> skillTagLookup, ComponentLookup<ShieldProperties> shieldLookup, ComponentLookup<CreatureMove> moveLookup,
+            BufferLookup<SkillEntities> skillEntitiesLookup, ComponentLookup<SkillTag> skillTagLookup, ComponentLookup<ShieldProperties> shieldLookup, ComponentLookup<StatusMove> moveLookup,
             ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup,
             EntityCommandBuffer ecb, out EDamageNumber critType)
         {
@@ -820,17 +837,17 @@ namespace Dots
             var critPercent = bulletAtk.Crit;
 
             //buff加的暴击
-            critPercent += BuffHelper.GetBuffAddFactor(attacker, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.Crit, bulletId, bulletClassId, false, hpPercent);
+            critPercent += BuffHelper.GetBuffAddFactor(attacker, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.Crit, bulletId, bulletClassId, false, hpPercent);
 
             //根据移动速度计算暴击 
             {
-                var addSpeedFactor = CreatureHelper.GetMoveSpeedFactor(attacker, creatureLookup, shieldLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, attrLookup, attrModifyLookup);
-                critPercent += BuffHelper.GetBuffFactorByTempPercent(EBuffType.CritByMoveSpeed, addSpeedFactor, attacker, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+                var addSpeedFactor = CreatureHelper.GetMoveSpeedFactor(attacker, summonLookup, propsLookup, shieldLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, attrLookup, attrModifyLookup);
+                critPercent += BuffHelper.GetBuffFactorByTempPercent(EBuffType.CritByMoveSpeed, addSpeedFactor, attacker, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
             }
 
             //attr
             {
-                var attrCrit = AttrHelper.GetAttr(attacker, EAttr.Crit, attrLookup, attrModifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+                var attrCrit = AttrHelper.GetAttr(attacker, EAttr.Crit, attrLookup, attrModifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
                 critPercent += attrCrit;
             }
             
@@ -855,7 +872,7 @@ namespace Dots
                     }, ecb);
 
                     //如果master是召唤物，触发master的trigger
-                    if (creatureLookup.TryGetComponent(attacker, out var masterCreature) && creatureLookup.HasComponent(masterCreature.SummonParent))
+                    if (summonLookup.TryGetComponent(attacker, out var masterCreature) && summonLookup.HasComponent(masterCreature.SummonParent))
                     {
                         SkillHelper.DoSkillTrigger(masterCreature.SummonParent, skillEntitiesLookup, skillTagLookup, new SkillTriggerData(ESkillTrigger.OnCrit)
                         {
@@ -871,14 +888,14 @@ namespace Dots
                 var critDamagePercent = bulletAtk.CritDamage;
 
                 //buff加的暴击伤害
-                critDamagePercent += BuffHelper.GetBuffAddFactor(attacker, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.CritDamage, bulletId, bulletClassId, false, hpPercent);
+                critDamagePercent += BuffHelper.GetBuffAddFactor(attacker, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.CritDamage, bulletId, bulletClassId, false, hpPercent);
                 
                 //attr
-                critDamagePercent += AttrHelper.GetAttr(attacker, EAttr.CritDamage, attrLookup, attrModifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+                critDamagePercent += AttrHelper.GetAttr(attacker, EAttr.CritDamage, attrLookup, attrModifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
                 
                 //判断是否产生致命一击
                 //如果确定产生暴击率，处理致命一击
-                var buffResult = BuffHelper.GetBuffFactorAndValue(attacker, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.SuperCrit);
+                var buffResult = BuffHelper.GetBuffFactorAndValue(attacker, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.SuperCrit);
                 var isSuperCrit = global.Random.ValueRW.Value.NextFloat(0f, 1f) <= buffResult.TempData;
                 if (isSuperCrit)
                 {

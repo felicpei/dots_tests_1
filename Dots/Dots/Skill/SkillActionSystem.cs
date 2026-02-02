@@ -17,10 +17,10 @@ namespace Dots
     {
         [ReadOnly] private ComponentLookup<LocalPlayerTag> _localPlayerLookup;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
-        [ReadOnly] private ComponentLookup<CreatureForward> _creatureForwardLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<CreatureProps> _propsLookup;
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
@@ -48,11 +48,11 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
             
             _localPlayerLookup = state.GetComponentLookup<LocalPlayerTag>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
-            _creatureForwardLookup = state.GetComponentLookup<CreatureForward>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _propsLookup = state.GetComponentLookup<CreatureProps>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
@@ -88,8 +88,8 @@ namespace Dots
             }
 
             _localPlayerLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
-            _creatureForwardLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _propsLookup.Update(ref state);
             _transformLookup.Update(ref state);
             _creatureTag.Update(ref state);
             _deadLookup.Update(ref state);
@@ -123,8 +123,8 @@ namespace Dots
                 CacheEntity = cacheEntity,
                 GlobalEntity = global.Entity,
                 TransformLookup = _transformLookup,
-                CreatureLookup = _creatureLookup,
-                CreatureForwardLookup = _creatureForwardLookup,
+                SummonLookup = _summonLookup,
+                PropsLookup = _propsLookup,
                 CreatureTag = _creatureTag,
                 DeadLookup = _deadLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
@@ -164,10 +164,10 @@ namespace Dots
             [ReadOnly] public CollisionWorld CollisionWorld;
             [ReadOnly] public ComponentLookup<LocalPlayerTag> LocalPlayerLookup;
             [ReadOnly] public ComponentLookup<LocalTransform> TransformLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
-            [ReadOnly] public ComponentLookup<CreatureForward> CreatureForwardLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
+            [ReadOnly] public ComponentLookup<CreatureProps> PropsLookup;
             [ReadOnly] public ComponentLookup<CreatureTag> CreatureTag;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
@@ -261,7 +261,7 @@ namespace Dots
                             }
 
                             //不对坐标生效
-                            if (CreatureLookup.HasComponent(targetEntity))
+                            if (SummonLookup.HasComponent(targetEntity))
                             {
                                 var bulletBuffer = new BulletCreateBuffer
                                 {
@@ -287,7 +287,7 @@ namespace Dots
                             var targetEntity = isMaster ? master.Value : action.Entity;
 
                             //不对坐标生效
-                            if (CreatureLookup.HasComponent(targetEntity))
+                            if (SummonLookup.HasComponent(targetEntity))
                             {
                                 Ecb.AppendToBuffer(sortKey, targetEntity, new CreatureDataProcess
                                 {
@@ -305,7 +305,7 @@ namespace Dots
                             var count = (int)actionConfig.Param2;
                             var radius = actionConfig.Param3;
 
-                            var buffResult = BuffHelper.GetBuffFactorAndValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillShootBulletCount, skillConfig.ClassId, skillConfig.Id);
+                            var buffResult = BuffHelper.GetBuffFactorAndValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillShootBulletCount, skillConfig.ClassId, skillConfig.Id);
                             count += (int)buffResult.AddValue;
                             count = (int)(BuffHelper.CalcFactor(count, buffResult.AddFactor));
 
@@ -365,7 +365,7 @@ namespace Dots
                             var interval = actionConfig.Param5;
                             if (count <= 0) count = 1;
 
-                            var buffResult = BuffHelper.GetBuffFactorAndValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillShootBulletCount, skillConfig.ClassId, skillConfig.Id);
+                            var buffResult = BuffHelper.GetBuffFactorAndValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillShootBulletCount, skillConfig.ClassId, skillConfig.Id);
                             count += (int)buffResult.AddValue;
                             count = (int)(BuffHelper.CalcFactor(count, buffResult.AddFactor));
 
@@ -532,7 +532,7 @@ namespace Dots
                                 count = 1;
                             }
 
-                            var buffResult = BuffHelper.GetBuffFactorAndValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillShootBulletCount, skillConfig.ClassId, skillConfig.Id);
+                            var buffResult = BuffHelper.GetBuffFactorAndValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillShootBulletCount, skillConfig.ClassId, skillConfig.Id);
                             count += (int)buffResult.AddValue;
                             count = (int)(BuffHelper.CalcFactor(count, buffResult.AddFactor));
 
@@ -642,7 +642,7 @@ namespace Dots
                             var forcePos = actionConfig.Param7.ToInt() == 1;
 
                             //基础属性影响持续时间
-                            contTime = BuffHelper.CalcContTime(contTime, master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                            contTime = BuffHelper.CalcContTime(contTime, master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
 
                             if (TransformLookup.TryGetComponent(master.Value, out var masterTrans) && MuzzlePosLookup.TryGetComponent(master.Value, out var muzzlePos))
                             {
@@ -685,7 +685,7 @@ namespace Dots
                         case ESkillAction.DirectDamage:
                         {
                             //不对坐标生效 
-                            if (CreatureLookup.HasComponent(action.Entity))
+                            if (SummonLookup.HasComponent(action.Entity))
                             {
                                 var bulletId = (int)actionConfig.Param1;
                                 if (bulletId > 0)
@@ -778,7 +778,7 @@ namespace Dots
 
                             //给目标上Buff(不对坐标生效)
                             var addEntity = forceMaster ? master.Value : action.Entity;
-                            if (CreatureLookup.HasComponent(addEntity))
+                            if (SummonLookup.HasComponent(addEntity))
                             {
                                 BuffHelper.AppendCreateBuffData(GlobalEntity, buffId, addEntity, master.Value, contTime, EBuffFrom.Skill, skillConfig.Id, Ecb, sortKey);
                             }
@@ -789,7 +789,7 @@ namespace Dots
                         //加随机buff
                         case ESkillAction.AddRandomBuff:
                         {
-                            if (CreatureLookup.HasComponent(action.Entity))
+                            if (SummonLookup.HasComponent(action.Entity))
                             {
                                 var buffId1 = (int)actionConfig.Param1;
                                 var buffId2 = (int)actionConfig.Param2;
@@ -838,7 +838,7 @@ namespace Dots
                             var forceMaster = actionConfig.Param2.ToInt() == 1;
                             var removeEntity = forceMaster ? master.Value : action.Entity;
 
-                            if (CreatureLookup.HasComponent(removeEntity))
+                            if (SummonLookup.HasComponent(removeEntity))
                             {
                                 BuffHelper.RemoveBuffById(buffId, removeEntity, BuffEntitiesLookup, BuffTagLookup, Ecb, sortKey);
                             }
@@ -849,7 +849,7 @@ namespace Dots
                         {
                             var forceMaster = actionConfig.Param1.ToInt() == 1;
                             var removeEntity = forceMaster ? master.Value : action.Entity;
-                            if (CreatureLookup.HasComponent(removeEntity))
+                            if (SummonLookup.HasComponent(removeEntity))
                             {
                                 BuffHelper.RemoveAllBuff(removeEntity, BuffEntitiesLookup, BuffTagLookup, Ecb, sortKey);
                             }
@@ -862,7 +862,7 @@ namespace Dots
                             var bulletClassId = actionConfig.Param2.ToInt();
                             var actionId = actionConfig.Param3.ToInt();
 
-                            if (CreatureLookup.HasComponent(action.Entity))
+                            if (SummonLookup.HasComponent(action.Entity))
                             {
                                 Ecb.AppendToBuffer(sortKey, action.Entity, new CreatureDataProcess
                                 {
@@ -923,7 +923,7 @@ namespace Dots
                                 {
                                     if (maxRecursion > 0)
                                     {
-                                        var addRecursionCount = BuffHelper.GetBuffAddValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillRecursionCount,
+                                        var addRecursionCount = BuffHelper.GetBuffAddValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillRecursionCount,
                                             skillConfig.ClassId, skillConfig.Id);
                                         maxRecursion += (int)addRecursionCount;
                                     }
@@ -954,7 +954,7 @@ namespace Dots
 
                                     if (delay > 0)
                                     {
-                                        var buffDelaySec = BuffHelper.GetBuffAddFactor(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillDelayTime, skillConfig.ClassId, skillConfig.Id);
+                                        var buffDelaySec = BuffHelper.GetBuffAddFactor(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillDelayTime, skillConfig.ClassId, skillConfig.Id);
                                         delay += buffDelaySec;
                                     }
 
@@ -1069,7 +1069,7 @@ namespace Dots
 
                             if (bulletCount <= 0) bulletCount = 1;
 
-                            var buffResult = BuffHelper.GetBuffFactorAndValue(master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillShootBulletCount, skillConfig.ClassId, skillConfig.Id);
+                            var buffResult = BuffHelper.GetBuffFactorAndValue(master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, EBuffType.SkillShootBulletCount, skillConfig.ClassId, skillConfig.Id);
                             bulletCount += (int)buffResult.AddValue;
                             bulletCount = (int)(BuffHelper.CalcFactor(bulletCount, buffResult.AddFactor));
 
@@ -1269,7 +1269,7 @@ namespace Dots
                                 var scaleFactor = 1f;
                                 if (influenceByAtkRange)
                                 {
-                                    scaleFactor += AttrHelper.GetDamageRangeFactor(master.Value, CreatureLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, false);
+                                    scaleFactor += AttrHelper.GetDamageRangeFactor(master.Value, SummonLookup, AttrLookup, AttrModifyLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup, false);
                                 }
 
                                 var parent = usePosition ? Entity.Null : action.Entity;
@@ -1320,7 +1320,7 @@ namespace Dots
                         case ESkillAction.RemoveEffect:
                         {
                             var resourceId = (int)actionConfig.Param1;
-                            if (CreatureLookup.HasComponent(action.Entity))
+                            if (SummonLookup.HasComponent(action.Entity))
                             {
                                 if (ChildLookup.TryGetBuffer(action.Entity, out var xChildren))
                                 {
@@ -1386,7 +1386,7 @@ namespace Dots
                                 count = 1;
                             }
 
-                            if (CreatureLookup.TryGetComponent(master.Value, out var masterCreature))
+                            if (CreatureTag.TryGetComponent(master.Value, out var masterCreature))
                             {
                                 for (var c = 0; c < count; c++)
                                 {
@@ -1396,7 +1396,7 @@ namespace Dots
                                         HpPercent = hpPercent,
                                         BornPos = actionPos,
                                         IsBoss = isBoss,
-                                        TeamId = masterCreature.AtkValue.Team,
+                                        TeamId = masterCreature.TeamId,
                                     });
                                 }
                             }
@@ -1412,9 +1412,9 @@ namespace Dots
                             var useParentAsSummoner = (int)actionConfig.Param3 == 1;
 
                             var parent = master.Value;
-                            if (CreatureLookup.TryGetComponent(parent, out var masterCreature))
+                            if (SummonLookup.TryGetComponent(parent, out var masterCreature))
                             {
-                                if (useParentAsSummoner && CreatureLookup.HasComponent(masterCreature.SummonParent))
+                                if (useParentAsSummoner && SummonLookup.HasComponent(masterCreature.SummonParent))
                                 {
                                     parent = masterCreature.SummonParent;
                                 }
@@ -1425,7 +1425,7 @@ namespace Dots
                             var bornAngle = 0f;
                             if (actionConfig.Action == ESkillAction.Hatch)
                             {
-                                if (CreatureLookup.TryGetComponent(action.Entity, out var creature))
+                                if (CreatureTag.TryGetComponent(action.Entity, out var creature))
                                 {
                                     if (creature.Type != ECreatureType.Player)
                                     {
@@ -1462,7 +1462,7 @@ namespace Dots
                             var toMaster = actionConfig.Param3.ToInt() == 1;
                             var stopEntity = toMaster ? master.Value : action.Entity;
 
-                            if (CreatureLookup.HasComponent(stopEntity) && TransformLookup.TryGetComponent(stopEntity, out var stopTrans))
+                            if (SummonLookup.HasComponent(stopEntity) && TransformLookup.TryGetComponent(stopEntity, out var stopTrans))
                             {
                                 if (turnToTarget)
                                 {
@@ -1485,7 +1485,7 @@ namespace Dots
                             var toMaster = actionConfig.Param1.ToInt() == 1;
 
                             var stopEntity = toMaster ? master.Value : action.Entity;
-                            if (CreatureLookup.HasComponent(stopEntity))
+                            if (SummonLookup.HasComponent(stopEntity))
                             {
                                 Ecb.SetComponentEnabled<DisableMoveTag>(sortKey, stopEntity, false);
                             }
@@ -1748,7 +1748,7 @@ namespace Dots
                                 //scale with bullet
                                 if (bulletId > 0 && CacheHelper.GetBulletConfig(bulletId, CacheEntity, CacheLookup, out var bulletConfig))
                                 {
-                                    radius = BulletHelper.CalcBulletBombRadius(bulletConfig.BombRadius, bulletConfig, master.Value, false, Entity.Null, CreatureLookup, AttrLookup, AttrModifyLookup, TransformLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                                    radius = BulletHelper.CalcBulletBombRadius(bulletConfig.BombRadius, bulletConfig, master.Value, false, Entity.Null, SummonLookup, AttrLookup, AttrModifyLookup, TransformLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                                 }
 
                                 Ecb.AppendToBuffer(sortKey, GlobalEntity, new EffectCreateBuffer
@@ -1769,7 +1769,7 @@ namespace Dots
                             var speed = actionConfig.Param2;
                             var contTime = actionConfig.Param3;
 
-                            contTime = BuffHelper.CalcContTime(contTime, master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                            contTime = BuffHelper.CalcContTime(contTime, master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
 
                             var enemies = PhysicsHelper.OverlapEnemies(master.Value, CollisionWorld, actionPos, radius, CreatureTag, DeadLookup, properties.ValueRO.AtkValue.Team);
                             for (var e = 0; e < enemies.Length; e++)
@@ -1791,7 +1791,7 @@ namespace Dots
                             var radius = actionConfig.Param1;
                             var contTime = actionConfig.Param2;
 
-                            contTime = BuffHelper.CalcContTime(contTime, master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                            contTime = BuffHelper.CalcContTime(contTime, master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
 
                             var enemies = PhysicsHelper.OverlapEnemies(master.Value, CollisionWorld, actionPos, radius, CreatureTag, DeadLookup, properties.ValueRO.AtkValue.Team);
                             for (var e = 0; e < enemies.Length; e++)
@@ -1810,7 +1810,7 @@ namespace Dots
                         //增加最大血量
                         case ESkillAction.AddMaxHp:
                         {
-                            if (CreatureLookup.HasComponent(action.Entity))
+                            if (SummonLookup.HasComponent(action.Entity))
                             {
                                 var value = (int)actionConfig.Param1;
                                 var percent = actionConfig.Param2;
@@ -1831,7 +1831,7 @@ namespace Dots
                             var percent = actionConfig.Param1;
                             var contTime = actionConfig.Param2;
 
-                            if (CreatureLookup.HasComponent(action.Entity))
+                            if (SummonLookup.HasComponent(action.Entity))
                             {
                                 Ecb.AppendToBuffer(sortKey, action.Entity, new CreatureDataProcess
                                 {
@@ -1879,7 +1879,7 @@ namespace Dots
                         case ESkillAction.PlayAnimation:
                         {
                             var animationId = actionConfig.Param1.ToInt();
-                            if (CreatureLookup.HasComponent(master.Value))
+                            if (SummonLookup.HasComponent(master.Value))
                             {
                                 if (EventPlayAnimation.HasComponent(master.Value))
                                 {
@@ -1896,7 +1896,7 @@ namespace Dots
                         //播放动作
                         case ESkillAction.PlayAnimationIdle:
                         {
-                            if (CreatureLookup.HasComponent(master.Value))
+                            if (SummonLookup.HasComponent(master.Value))
                             {
                                 if (EventPlayAnimation.HasComponent(master.Value))
                                 {
@@ -1913,7 +1913,7 @@ namespace Dots
                         }
                         case ESkillAction.PlayAtk:
                         {
-                            if (CreatureLookup.HasComponent(master.Value))
+                            if (SummonLookup.HasComponent(master.Value))
                             {
                                 if (EventPlayAnimation.HasComponent(master.Value))
                                 {
@@ -1933,7 +1933,7 @@ namespace Dots
                         case ESkillAction.ImmediatelyDie:
                         {
                             var banDeadTrigger = actionConfig.Param1.ToInt() == 1;
-                            if (CreatureLookup.TryGetComponent(action.Entity, out var creature))
+                            if (CreatureTag.TryGetComponent(action.Entity, out var creature))
                             {
                                 //暂时不对玩家生效
                                 if (creature.Type != ECreatureType.Player)
@@ -1971,9 +1971,10 @@ namespace Dots
                             {
                                 foreach (var summonEntity in summonEntities)
                                 {
-                                    if (TransformLookup.TryGetComponent(summonEntity.Value, out var summonTransform) && CreatureLookup.TryGetComponent(summonEntity.Value, out var summonCreature))
+                                    if (TransformLookup.TryGetComponent(summonEntity.Value, out var summonTransform) && 
+                                        PropsLookup.TryGetComponent(summonEntity.Value, out var props))
                                     {
-                                        SkillHelper.AddSkill(GlobalEntity, summonEntity.Value, skillId, summonCreature.AtkValue, summonTransform.Position, Ecb, sortKey);
+                                        SkillHelper.AddSkill(GlobalEntity, summonEntity.Value, skillId, props.AtkValue, summonTransform.Position, Ecb, sortKey);
                                     }
                                 }
                             }
@@ -1983,11 +1984,12 @@ namespace Dots
                         case ESkillAction.AddSkillToMaster:
                         {
                             var skillId = actionConfig.Param1.ToInt();
-                            if (CreatureLookup.TryGetComponent(master.Value, out var masterCreature))
+                            if (SummonLookup.TryGetComponent(master.Value, out var masterCreature))
                             {
-                                if (TransformLookup.TryGetComponent(masterCreature.SummonParent, out var parentTransform) && CreatureLookup.TryGetComponent(masterCreature.SummonParent, out var parentCreature))
+                                if (TransformLookup.TryGetComponent(masterCreature.SummonParent, out var parentTransform) && 
+                                    PropsLookup.TryGetComponent(masterCreature.SummonParent, out var props))
                                 {
-                                    SkillHelper.AddSkill(GlobalEntity, masterCreature.SummonParent, skillId, parentCreature.AtkValue, parentTransform.Position, Ecb, sortKey);
+                                    SkillHelper.AddSkill(GlobalEntity, masterCreature.SummonParent, skillId, props.AtkValue, parentTransform.Position, Ecb, sortKey);
                                 }
                             }
 
@@ -2034,7 +2036,7 @@ namespace Dots
                             var contTime = actionConfig.Param1;
                             var effectId = actionConfig.Param2.ToInt();
 
-                            contTime = BuffHelper.CalcContTime(contTime, master.Value, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                            contTime = BuffHelper.CalcContTime(contTime, master.Value, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
 
                             //进入时停
                             Ecb.SetComponent(sortKey, GlobalEntity, new GlobalMonsterPauseData
@@ -2084,7 +2086,7 @@ namespace Dots
                         }
                         case ESkillAction.Teleport:
                         {
-                            if (CreatureLookup.HasComponent(master.Value))
+                            if (SummonLookup.HasComponent(master.Value))
                             {
                                 Ecb.AppendToBuffer(sortKey, master.Value, new CreatureDataProcess { Type = ECreatureDataProcess.Teleport, Float3Value = actionPos });
                                 Ecb.SetComponentEnabled<CreatureDataProcess>(sortKey, master.Value, true);
@@ -2095,7 +2097,7 @@ namespace Dots
                         case ESkillAction.SetBuffEnable:
                         {
                             var bActive = actionConfig.Param1.ToInt() == 1;
-                            if (CreatureLookup.HasComponent(action.Entity))
+                            if (SummonLookup.HasComponent(action.Entity))
                             {
                                 Ecb.SetComponentEnabled<DisableBuffTag>(sortKey, action.Entity, !bActive);
                             }

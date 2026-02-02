@@ -12,7 +12,7 @@ namespace Dots
     {
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
         [ReadOnly] private ComponentLookup<MonsterProperties> _monsterLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
@@ -33,7 +33,7 @@ namespace Dots
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
             _monsterLookup = state.GetComponentLookup<MonsterProperties>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
@@ -53,7 +53,7 @@ namespace Dots
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
             _monsterLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _skillEntitiesLookup.Update(ref state);
             _skillTagLookup.Update(ref state);
             _attrLookup.Update(ref state);
@@ -68,7 +68,7 @@ namespace Dots
             {
                 FactoryHelper.CreateBullet(global, cache, buffer, ecb,
                     _transformLookup,
-                    _creatureLookup,
+                    _summonLookup,
                     _attrLookup,
                     _attrModifyLookup,
                     _buffEntitiesLookup,

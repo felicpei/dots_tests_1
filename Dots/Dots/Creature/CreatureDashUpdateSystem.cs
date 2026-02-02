@@ -14,8 +14,8 @@ namespace Dots
     public partial struct CreatureDashUpdateSystem : ISystem
     {
         // 缓存 Lookup 以提高性能
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
-        [ReadOnly] private ComponentLookup<InFreezeTag> _inFreezeLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
+        [ReadOnly] private ComponentLookup<InFreezeState> _inFreezeLookup;
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
 
@@ -27,8 +27,8 @@ namespace Dots
             state.RequireForUpdate<PhysicsWorldSingleton>();
             state.RequireForUpdate(new EntityQueryBuilder(Allocator.Temp).WithAll<InDashingTag>() .Build(ref state));
             
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
-            _inFreezeLookup = state.GetComponentLookup<InFreezeTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
+            _inFreezeLookup = state.GetComponentLookup<InFreezeState>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
         }
@@ -76,16 +76,17 @@ namespace Dots
             public Entity GlobalEntity;
             [ReadOnly] public CollisionWorld CollisionWorld;
 
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
-            [ReadOnly] public ComponentLookup<InFreezeTag> InFreezeLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
+            [ReadOnly] public ComponentLookup<InFreezeState> InFreezeLookup;
             [ReadOnly] public BufferLookup<SkillEntities> SkillEntitiesLookup;
             [ReadOnly] public ComponentLookup<SkillTag> SkillTagLookup;
 
             private void Execute(Entity entity, [EntityIndexInQuery] int sortKey,
-                RefRW<CreatureProperties> creature,
+                StatusHp hpInfo,
+                RefRW<CreatureTag> creature,
                 RefRW<LocalTransform> localTransform,
                 RefRW<InDashingTag> data,
-                RefRW<CreatureMove> creatureMove)
+                RefRW<StatusMove> creatureMove)
             {
                 // 1. 基础状态过滤
                 if (DeadLookup.IsComponentEnabled(entity))
@@ -142,7 +143,7 @@ namespace Dots
                 }
 
                 // 4. 结束判定与后续逻辑
-                if (data.ValueRO.CurTime >= data.ValueRO.TotalTime || bHitFence || creature.ValueRO.CurHp <= 0)
+                if (data.ValueRO.CurTime >= data.ValueRO.TotalTime || bHitFence || hpInfo.CurHp <= 0)
                 {
                     if (data.ValueRO.AfterSkillId > 0)
                     {

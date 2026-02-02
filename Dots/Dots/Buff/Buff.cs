@@ -11,7 +11,7 @@ namespace Dots
         Overlap,
     }
 
-    [InternalBufferCapacity(2)]
+    [InternalBufferCapacity(4)]
     public struct BuffUpdateBuffer : IBufferElementData, IEnableableComponent
     {
         public readonly EBuffUpdate Value;

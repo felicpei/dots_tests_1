@@ -10,11 +10,23 @@ namespace Dots
     {
         //怪物伤害检测
         public static void HitCreature(BulletProperties properties, Entity bulletEntity, ComponentLookup<BulletRepel> bulletRepelLookup,
-            Entity globalEntity, Entity cacheEntity, ComponentLookup<CacheProperties> cacheLookup, RefRW<RandomSeed> random,
-            DynamicBuffer<BulletHitCreature> hitCreatures,EntityCommandBuffer.ParallelWriter ecb, int sortKey,
-            Entity hitCreature, bool fromExplosion,BufferLookup<SkillEntities> skillEntitiesLookup,ComponentLookup<SkillTag> skillTagLookup, BufferLookup<BuffEntities> buffEntitiesLookup,
-            ComponentLookup<BuffTag> buffTagLookup,  ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<BuffCommonData> buffCommonLookup, ComponentLookup<BuffAppendRandomIds> buffAppendBuffToBullet,
-            ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> modifyLookup)
+            Entity globalEntity, Entity cacheEntity, 
+            ComponentLookup<CacheProperties> cacheLookup, 
+            RefRW<RandomSeed> random,
+            DynamicBuffer<BulletHitCreature> hitCreatures,
+            EntityCommandBuffer.ParallelWriter ecb,
+            int sortKey,
+            Entity hitCreature, 
+            bool fromExplosion, 
+            BufferLookup<SkillEntities> skillEntitiesLookup,
+            ComponentLookup<SkillTag> skillTagLookup, 
+            BufferLookup<BuffEntities> buffEntitiesLookup,
+            ComponentLookup<BuffTag> buffTagLookup, 
+            ComponentLookup<StatusSummon> summonLookup, 
+            ComponentLookup<BuffCommonData> buffCommonLookup, 
+            ComponentLookup<BuffAppendRandomIds> buffAppendBuffToBullet,
+            ComponentLookup<PlayerAttrData> attrLookup, 
+            BufferLookup<PlayerAttrModify> modifyLookup)
         {
             if (!CacheHelper.GetBulletConfig(properties.BulletId, cacheEntity, cacheLookup, out var config))
             {
@@ -30,7 +42,7 @@ namespace Dots
             }, ecb, sortKey);
 
             //如果master是召唤物，触发master的trigger
-            if (creatureLookup.TryGetComponent(properties.MasterCreature, out var masterCreature) && creatureLookup.HasComponent(masterCreature.SummonParent))
+            if (summonLookup.TryGetComponent(properties.MasterCreature, out var masterCreature) && summonLookup.HasComponent(masterCreature.SummonParent))
             {
                 SkillHelper.DoSkillTrigger(masterCreature.SummonParent, skillEntitiesLookup, skillTagLookup, new SkillTriggerData(ESkillTrigger.BulletHitEnemy)
                 {
@@ -42,7 +54,7 @@ namespace Dots
             }
 
             //击退力度的buff
-            var buffResult = BuffHelper.GetBuffFactorAndValue(properties.MasterCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletHitForce, config.Id, config.ClassId);
+            var buffResult = BuffHelper.GetBuffFactorAndValue(properties.MasterCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletHitForce, config.Id, config.ClassId);
 
             //计算击退、击飞数据
             var hitForward = MathHelper.Up;
@@ -71,7 +83,7 @@ namespace Dots
             var damageFactor = config.DamageFactor;
             {
                 //buff bullet damage
-                var damageBuffResult = BuffHelper.GetBuffFactorAndValue(properties.MasterCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletDamage, config.Id, config.ClassId);
+                var damageBuffResult = BuffHelper.GetBuffFactorAndValue(properties.MasterCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletDamage, config.Id, config.ClassId);
                 damageFactor += damageBuffResult.AddValue;
             }
             
@@ -98,7 +110,7 @@ namespace Dots
             }
 
             //buff AppendBuffToBullet
-            var appendBuffList = BuffHelper.GetAppendBuffList(properties.MasterCreature, EBuffType.AppendBuffToBullet, config.Id, config.ClassId, creatureLookup, buffAppendBuffToBullet, buffEntitiesLookup, buffTagLookup);
+            var appendBuffList = BuffHelper.GetAppendBuffList(properties.MasterCreature, EBuffType.AppendBuffToBullet, config.Id, config.ClassId, summonLookup, buffAppendBuffToBullet, buffEntitiesLookup, buffTagLookup);
             if (appendBuffList.Length > 0)
             {
                 var idx = random.ValueRW.Value.NextInt(0, appendBuffList.Length);
@@ -108,21 +120,21 @@ namespace Dots
             appendBuffList.Dispose();
 
             //记录命中过哪些怪
-            var damageInterval = BuffHelper.CalcDamageInterval(config.DamageInterval, config, properties.MasterCreature, creatureLookup, attrLookup, modifyLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+            var damageInterval = BuffHelper.CalcDamageInterval(config.DamageInterval, config, properties.MasterCreature, summonLookup, attrLookup, modifyLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
             hitCreatures.Add(new BulletHitCreature { Value = hitCreature, Timer = damageInterval });
         }
 
-        public static float CalcBulletVelocity(Entity parentCreature, BulletConfig config, ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup,
+        public static float CalcBulletVelocity(Entity parentCreature, BulletConfig config, ComponentLookup<StatusSummon> summonLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup, out float acc)
         {
             acc = config.Acceleration;
             var velocity = config.Velocity;
             
             //子弹飞行速度的Buff(在parent身上找)
-            var bulletSpeedFactor = BuffHelper.GetBuffAddFactor(parentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletSpeed, config.Id, config.ClassId);
+            var bulletSpeedFactor = BuffHelper.GetBuffAddFactor(parentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletSpeed, config.Id, config.ClassId);
             
             //attr
-            bulletSpeedFactor += AttrHelper.GetAttr(parentCreature, EAttr.BulletSpeed, attrLookup, attrModifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+            bulletSpeedFactor += AttrHelper.GetAttr(parentCreature, EAttr.BulletSpeed, attrLookup, attrModifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
 
             var minValue = AttrHelper.GetMin(EAttr.BulletSpeed);
             if (bulletSpeedFactor < minValue)
@@ -135,7 +147,7 @@ namespace Dots
             return velocity;
         }
 
-        public static void CalcSplitInfo(BulletConfig bulletConfig, Entity parentCreature, ComponentLookup<CreatureProperties> creatureLookup,
+        public static void CalcSplitInfo(BulletConfig bulletConfig, Entity parentCreature, ComponentLookup<StatusSummon> summonLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup,
             out int splitCount, out float splitAngle)
         {
@@ -150,7 +162,7 @@ namespace Dots
             var spiltAddValue = 0;
             var splitAddFactor = 0f;
 
-            var buffResult = BuffHelper.GetBuffFactorAndValue(parentCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletSplit, bulletConfig.Id, bulletConfig.ClassId);
+            var buffResult = BuffHelper.GetBuffFactorAndValue(parentCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletSplit, bulletConfig.Id, bulletConfig.ClassId);
             spiltAddValue += (int)buffResult.AddValue;
             splitAddFactor += buffResult.AddFactor;
 
@@ -164,7 +176,7 @@ namespace Dots
         }
 
         public static float CalcBulletBombRadius(float bombRadius, BulletConfig bulletConfig, Entity masterCreature, bool immediatelyBomb, Entity forceHitCreature,
-            ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup, ComponentLookup<LocalTransform> transformLookup,
+            ComponentLookup<StatusSummon> summonLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup, ComponentLookup<LocalTransform> transformLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
         {
             //防错，如果是立即爆炸了，但爆炸范围忘记配，则给个0.1范围
@@ -182,10 +194,10 @@ namespace Dots
             if (bombRadius > 0f)
             {
                 //爆炸范围的buff处理
-                var addFactor = BuffHelper.GetBuffAddFactor(masterCreature, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletExplosionRange, bulletConfig.Id, bulletConfig.ClassId);
+                var addFactor = BuffHelper.GetBuffAddFactor(masterCreature, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BulletExplosionRange, bulletConfig.Id, bulletConfig.ClassId);
              
                 //attr:damage range
-                addFactor += AttrHelper.GetDamageRangeFactor(masterCreature, creatureLookup, attrLookup, attrModifyLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, false);
+                addFactor += AttrHelper.GetDamageRangeFactor(masterCreature, summonLookup, attrLookup, attrModifyLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, false);
                 
                 bombRadius = BuffHelper.CalcFactor(bombRadius, addFactor);
             }
@@ -262,7 +274,7 @@ namespace Dots
         }
         
         
-        public static void BindCollisionBullet(GlobalAspect global, Entity creatureEntity, CreatureProperties creature, 
+        public static void BindCollisionBullet(GlobalAspect global, Entity creatureEntity, CreatureProps creatureProps, 
             BufferLookup<BindingBullet> bindBulletLookup, ComponentLookup<LocalTransform> transformLookup, int bulletId)
         {
             if (bindBulletLookup.TryGetBuffer(creatureEntity, out var bindingBullets))
@@ -284,7 +296,7 @@ namespace Dots
                     var bulletBuffer = new BulletCreateBuffer
                     {
                         From = EBulletFrom.Collision,
-                        AtkValue = new AtkValue(creature.AtkValue.Atk, creature.AtkValue.Crit, creature.AtkValue.CritDamage, creature.AtkValue.Team),
+                        AtkValue = new AtkValue(creatureProps.AtkValue.Atk, creatureProps.AtkValue.Crit, creatureProps.AtkValue.CritDamage, creatureProps.AtkValue.Team),
                         BulletId = bulletId,
                         TransformParent = creatureEntity,
                         ParentCreature = creatureEntity,
@@ -318,8 +330,12 @@ namespace Dots
         
         
         public static void BindBuffBullet(GlobalAspect global, Entity buffEntity, 
-            ComponentLookup<BuffTag> buffLookup, ComponentLookup<CreatureProperties> creatureLookup, BufferLookup<BindingBullet> bindingBulletLookup,
-            ComponentLookup<LocalTransform> localToWorldLookup, ComponentLookup<BulletProperties> bulletLookup, int bulletId, int layer, EntityCommandBuffer ecb)
+            ComponentLookup<BuffTag> buffLookup, 
+            ComponentLookup<CreatureProps> propsLookup, 
+            BufferLookup<BindingBullet> bindingBulletLookup,
+            ComponentLookup<LocalTransform> localToWorldLookup, 
+            ComponentLookup<BulletProperties> bulletLookup, 
+            int bulletId, int layer, EntityCommandBuffer ecb)
         {
             if (bulletId <= 0)
             {
@@ -327,7 +343,7 @@ namespace Dots
             }
 
             if (buffLookup.TryGetComponent(buffEntity, out var buffProperties) &&
-                creatureLookup.TryGetComponent(buffProperties.Attacker, out var attacker) &&
+                propsLookup.TryGetComponent(buffProperties.Attacker, out var attacker) &&
                 localToWorldLookup.TryGetComponent(buffProperties.Master, out var masterTrans))
             {
                 var bFindOld = false;

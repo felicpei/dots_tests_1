@@ -66,8 +66,15 @@ namespace Dots
             }
         }
 
-        public static void CreateSkill(float deltaTime, GlobalAspect global, CacheAspect cache, CreateSkillBuffer buffer, EntityCommandBuffer ecb, ComponentLookup<CreatureProperties> creatureLookup, BufferLookup<SkillEntities> skillEntitiesLookup,
-            ComponentLookup<SkillProperties> skillPropertiesLookup, ComponentLookup<LocalToWorld> localToWorldLookup, BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
+        public static void CreateSkill(float deltaTime, GlobalAspect global, 
+            CacheAspect cache, CreateSkillBuffer buffer, EntityCommandBuffer ecb, 
+            ComponentLookup<StatusSummon> summonLookup, 
+            BufferLookup<SkillEntities> skillEntitiesLookup,
+            ComponentLookup<SkillProperties> skillPropertiesLookup, 
+            ComponentLookup<LocalToWorld> localToWorldLookup, 
+            BufferLookup<BuffEntities> buffEntitiesLookup, 
+            ComponentLookup<BuffTag> buffTagLookup, 
+            ComponentLookup<BuffCommonData> buffCommonLookup)
         {
             var skillId = buffer.SkillId;
             
@@ -128,7 +135,7 @@ namespace Dots
                 //检查buff替换技能
                 if (cache.GetSkillConfig(skillId, out var sourceSkillConfig))
                 {
-                    var attachList = BuffHelper.GetBuffAttachInt(buffer.Master, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BindSkill, sourceSkillConfig.ClassId, sourceSkillConfig.Id);
+                    var attachList = BuffHelper.GetBuffAttachInt(buffer.Master, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.BindSkill, sourceSkillConfig.ClassId, sourceSkillConfig.Id);
                     for (var i = 0; i < attachList.Length; i++)
                     {
                         ecb.AppendToBuffer(global.Entity, new CreateSkillBuffer(buffer.Master, attachList[i], buffer.AtkValue, buffer.StartEntity, buffer.StartPos, buffer.PrevTarget, buffer.RootSkillId, buffer.CastDelay, buffer.Recursion, buffer.MaxRecursion));
@@ -216,14 +223,14 @@ namespace Dots
         }
 
 
-        public static float CalcSkillCd(float cdSource, SkillConfig config, Entity master, ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup,
+        public static float CalcSkillCd(float cdSource, SkillConfig config, Entity master, ComponentLookup<StatusSummon> summonLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup,
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
         {
             //基础属性影响持续时间
-            var addFactor = BuffHelper.GetBuffAddFactor(master, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup,  EBuffType.SkillTriggerInterval, config.ClassId, config.Id);
+            var addFactor = BuffHelper.GetBuffAddFactor(master, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup,  EBuffType.SkillTriggerInterval, config.ClassId, config.Id);
 
             //attr: skill speed
-            addFactor += AttrHelper.GetAttr(master, EAttr.SkillSpeed, attrLookup, attrModifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup); 
+            addFactor += AttrHelper.GetAttr(master, EAttr.SkillSpeed, attrLookup, attrModifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup); 
             
             return BuffHelper.CalcFactorSpeed(cdSource, addFactor);
         }

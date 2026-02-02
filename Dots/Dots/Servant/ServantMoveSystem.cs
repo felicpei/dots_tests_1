@@ -14,16 +14,18 @@ namespace Dots
     [UpdateInGroup(typeof(PlayerSystemGroup))]
     public partial struct ServantMoveSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<InDashingTag> _dashLookup;
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
         [ReadOnly] private ComponentLookup<BuffCommonData> _buffCommonLookup;
         [ReadOnly] private ComponentLookup<DisableMoveTag> _banMoveLookup;
-        [ReadOnly] private ComponentLookup<InFreezeTag> _inFreezeLookup;
+        [ReadOnly] private ComponentLookup<InFreezeState> _inFreezeLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<CreatureProps> _propsLookup;
+        [ReadOnly] private ComponentLookup<CreatureTag> _creatureTagLookup;
         [ReadOnly] private ComponentLookup<ShieldProperties> _shieldLookup;
         [ReadOnly] private ComponentLookup<LocalToWorld> _transformLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
@@ -38,16 +40,18 @@ namespace Dots
             state.RequireForUpdate<PhysicsWorldSingleton>();
             state.RequireForUpdate<InputProperties>();
 
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _dashLookup = state.GetComponentLookup<InDashingTag>(true);
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
             _buffCommonLookup = state.GetComponentLookup<BuffCommonData>(true);
             _banMoveLookup = state.GetComponentLookup<DisableMoveTag>(true);
-            _inFreezeLookup = state.GetComponentLookup<InFreezeTag>(true);
+            _inFreezeLookup = state.GetComponentLookup<InFreezeState>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _propsLookup = state.GetComponentLookup<CreatureProps>(true);
+            _creatureTagLookup = state.GetComponentLookup<CreatureTag>(true);
             _shieldLookup = state.GetComponentLookup<ShieldProperties>(true);
             _transformLookup = state.GetComponentLookup<LocalToWorld>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
@@ -75,7 +79,9 @@ namespace Dots
             _banMoveLookup.Update(ref state);
             _inFreezeLookup.Update(ref state);
             _skillTagLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
+            _propsLookup.Update(ref state);
+            _creatureTagLookup.Update(ref state);
             _shieldLookup.Update(ref state);
             _transformLookup.Update(ref state);
             _attrLookup.Update(ref state);
@@ -96,7 +102,7 @@ namespace Dots
             if (!global.InPause)
             {
                 foreach (var (tag, creatureMove, creatureForward, localTransform, entity)
-                         in Query<RefRW<MainServantTag>, RefRW<CreatureMove>, RefRW<CreatureForward>, RefRW<LocalTransform>>().WithEntityAccess())
+                         in Query<RefRW<MainServantTag>, RefRW<StatusMove>, RefRW<StatusForward>, RefRW<LocalTransform>>().WithEntityAccess())
                 {
                     if (_deadLookup.HasComponent(entity) && _deadLookup.IsComponentEnabled(entity))
                     {
@@ -110,7 +116,7 @@ namespace Dots
                     if (input.MoveMode == EMoveJoyMode.Walk && !MathHelper.IsZero(input.MoveDirection) && bCanMove)
                     {
                         //calc moveSpeed
-                        var addFactor = CreatureHelper.GetMoveSpeedFactor(entity, _creatureLookup, _shieldLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, _attrLookup, _attrModifyLookup);
+                        var addFactor = CreatureHelper.GetMoveSpeedFactor(entity, _summonLookup, _propsLookup, _shieldLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup, _attrLookup, _attrModifyLookup);
                         var speed = creatureMove.ValueRO.MoveSpeedSource;
                         speed = BuffHelper.CalcFactor(speed, addFactor);
 
@@ -198,12 +204,13 @@ namespace Dots
                     }
 
                     //风速影响
-                    CreatureHelper.CalcWindPos(localPlayer, entity, deltaTime, localTransform, _creatureLookup, _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
+                    CreatureHelper.CalcWindPos(localPlayer, entity, deltaTime, localTransform, _creatureTagLookup, _summonLookup,
+                        _buffEntitiesLookup, _buffTagLookup, _buffCommonLookup);
                 }
             }
 
             foreach (var (servant, creatureMove, creatureForward, localTransform, entity)
-                     in Query<ServantProperties, RefRW<CreatureMove>, RefRW<CreatureForward>, RefRW<LocalTransform>>().WithNone<MainServantTag>().WithEntityAccess())
+                     in Query<ServantProperties, RefRW<StatusMove>, RefRW<StatusForward>, RefRW<LocalTransform>>().WithNone<MainServantTag>().WithEntityAccess())
             {
                 var bInMove = false;
                 var idx = 1;

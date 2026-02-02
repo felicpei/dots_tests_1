@@ -218,7 +218,7 @@ namespace Dots
         public float BornAngle;     //用于召唤环绕情况下的初始角度
     }
 
-    [InternalBufferCapacity(2)]
+    [InternalBufferCapacity(4)]
     public struct MonsterCreateBuffer : IBufferElementData
     {
         public int MonsterId;
@@ -400,7 +400,7 @@ namespace Dots
         public bool IsStop;
     }
 
-    [InternalBufferCapacity(2)]
+    [InternalBufferCapacity(4)]
     public struct PlayCameraShakeBuffer : IBufferElementData
     {
         public float Radius;
@@ -408,7 +408,7 @@ namespace Dots
         public float3 Pos;
     }
 
-    [InternalBufferCapacity(2)]
+    [InternalBufferCapacity(4)]
     public struct ControllerShakeBuffer : IBufferElementData
     {
         public HapticTypes ShakeType;

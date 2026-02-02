@@ -12,8 +12,10 @@ namespace Dots
     [UpdateInGroup(typeof(GlobalSystemGroup))]
     public partial struct FactoryMonsterSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<StatusCenter> _centerLookup;
+        [ReadOnly] private ComponentLookup<CreatureProps> _propsLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
@@ -29,8 +31,10 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
             state.RequireForUpdate<PhysicsWorldSingleton>();
             
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _centerLookup = state.GetComponentLookup<StatusCenter>(true);
+            _propsLookup = state.GetComponentLookup<CreatureProps>(true);
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
@@ -47,7 +51,7 @@ namespace Dots
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            _creatureLookup.Update(ref state);
+            _centerLookup.Update(ref state);
             _deadLookup.Update(ref state);
             _transformLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
@@ -55,6 +59,8 @@ namespace Dots
             _buffCommonLookup.Update(ref state);
             _skillEntitiesLookup.Update(ref state);
             _skillTagLookup.Update(ref state);
+            _propsLookup.Update(ref state);
+            _hpLookup.Update(ref state);
 
             var ecb = new EntityCommandBuffer(Allocator.Temp);
             var global = SystemAPI.GetAspect<GlobalAspect>(SystemAPI.GetSingletonEntity<GlobalInitialized>());
@@ -73,7 +79,7 @@ namespace Dots
                 {
                     ecb.RemoveComponent<ClearMonsterTag>(global.Entity);
 
-                    foreach (var (creature, entity) in SystemAPI.Query<CreatureProperties>().WithAll<MonsterProperties>().WithEntityAccess())
+                    foreach (var (creature, entity) in SystemAPI.Query<CreatureTag>().WithAll<MonsterProperties>().WithEntityAccess())
                     {
                         //排除boss
                         if (creature.Type == ECreatureType.Boss && !tag.ValueRO.ContainBoss)
@@ -82,7 +88,7 @@ namespace Dots
                         }
 
                         //排除玩家的召唤物
-                        if (creature.AtkValue.Team != ETeamId.Monster)
+                        if (creature.TeamId != ETeamId.Monster)
                         {
                             continue;
                         }
@@ -122,7 +128,8 @@ namespace Dots
                 global.SummonCreateBuffer.RemoveAt(i);
 
                 //召唤时，必须有Parent
-                if (_creatureLookup.TryGetComponent(buffer.Parent, out var creature))
+                if (_propsLookup.TryGetComponent(buffer.Parent, out var creature) &&
+                    _hpLookup.TryGetComponent(buffer.Parent, out var hpInfo))
                 {
                     var team = creature.AtkValue.Team;
                     var props = new FightProps
@@ -131,7 +138,7 @@ namespace Dots
                         Crit = creature.AtkValue.Crit,
                         CritDamage = creature.AtkValue.CritDamage,
                         Def = creature.Def,
-                        Hp = creature.FullHp,
+                        Hp = hpInfo.FullHp,
                         RepelCd = creature.RepelCd,
                     };
 
@@ -156,7 +163,7 @@ namespace Dots
             //血条
             for (var i = global.ProgressBarCreateBuffer.Length - 1; i >= 0; i--)
             {
-                FactoryHelper.CreateProgressBar(cache, global, global.ProgressBarCreateBuffer[i], ecb, _transformLookup, _deadLookup, _creatureLookup);
+                FactoryHelper.CreateProgressBar(cache, global, global.ProgressBarCreateBuffer[i], ecb, _transformLookup, _deadLookup, _centerLookup);
                 global.ProgressBarCreateBuffer.RemoveAt(i);
             }
 

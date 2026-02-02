@@ -1,12 +1,7 @@
-using Dots;
-using Dots;
-using Dots;
-using Dots;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Transforms;
-using UnityEngine;
 
 namespace Dots
 {
@@ -16,9 +11,9 @@ namespace Dots
     public partial struct FactoryBuffSystem : ISystem
     {
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
         [ReadOnly] private ComponentLookup<DisableBuffTag> _disableBuffTagLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
@@ -32,9 +27,9 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
             
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
             _disableBuffTagLookup = state.GetComponentLookup<DisableBuffTag>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
@@ -52,7 +47,7 @@ namespace Dots
             _creatureTag.Update(ref state);
             _deadLookup.Update(ref state);
             _transformLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _disableBuffTagLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
@@ -75,9 +70,9 @@ namespace Dots
 
                 global.CreateBuffData.RemoveAt(i);
                 var bAlive = _deadLookup.HasComponent(buffer.Master) && !_deadLookup.IsComponentEnabled(buffer.Master);
-                if (bAlive && _creatureLookup.HasComponent(buffer.Master))
+                if (bAlive && _summonLookup.HasComponent(buffer.Master))
                 {
-                    BuffHelper.AddBuff(global, cache, buffer, _creatureLookup, _disableBuffTagLookup, _buffEntitiesLookup, _buffTagLookup, _transformLookup, _buffCommonLookup, ecb);
+                    BuffHelper.AddBuff(global, cache, buffer, _summonLookup, _disableBuffTagLookup, _buffEntitiesLookup, _buffTagLookup, _transformLookup, _buffCommonLookup, ecb);
                     masters.Add(buffer.Master);
                 }
             }

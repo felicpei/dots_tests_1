@@ -13,9 +13,6 @@ namespace Dots
         [ReadOnly] private BufferLookup<SkillEntities> _skillEntitiesLookup;
         [ReadOnly] private ComponentLookup<SkillTag> _skillTagLookup;
         [ReadOnly] private ComponentLookup<HybridEvent_SetActive> _eventSetActive;
-        [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
-        [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -25,9 +22,6 @@ namespace Dots
             _skillEntitiesLookup = state.GetBufferLookup<SkillEntities>(true);
             _skillTagLookup = state.GetComponentLookup<SkillTag>(true);
             _eventSetActive = state.GetComponentLookup<HybridEvent_SetActive>(true);
-            _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
-            _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
         }
 
         [BurstCompile]
@@ -49,9 +43,6 @@ namespace Dots
             _skillEntitiesLookup.Update(ref state);
             _skillTagLookup.Update(ref state);
             _eventSetActive.Update(ref state);
-            _attrLookup.Update(ref state);
-            _attrModifyLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
             
             var ecb = new EntityCommandBuffer(Allocator.TempJob);
             var deltaTime = SystemAPI.Time.DeltaTime;
@@ -64,9 +55,6 @@ namespace Dots
                 SkillEntitiesLookup = _skillEntitiesLookup,
                 SkillTagLookup = _skillTagLookup,
                 EventSetActive = _eventSetActive,
-                AttrLookup = _attrLookup,
-                AttrModifyLookup = _attrModifyLookup,
-                CreatureLookup = _creatureLookup,
             }.ScheduleParallel();
             state.Dependency.Complete();
 
@@ -82,12 +70,9 @@ namespace Dots
             [ReadOnly] public BufferLookup<SkillEntities> SkillEntitiesLookup;
             [ReadOnly] public ComponentLookup<SkillTag> SkillTagLookup;
             [ReadOnly] public ComponentLookup<HybridEvent_SetActive> EventSetActive;
-            [ReadOnly] public ComponentLookup<PlayerAttrData> AttrLookup;
-            [ReadOnly] public BufferLookup<PlayerAttrModify> AttrModifyLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
             
             [BurstCompile]
-            private void Execute(RefRW<EnterReviveTag> tag, InDeadTag inDeadTag,  Entity entity, [EntityIndexInQuery] int sortKey)
+            private void Execute(RefRW<EnterReviveTag> tag, InDeadState inDeadState,  Entity entity, [EntityIndexInQuery] int sortKey)
             {
                 if (tag.ValueRO.Delay > 0)
                 {
@@ -99,7 +84,7 @@ namespace Dots
                 }
                 
                 Ecb.SetComponentEnabled<EnterReviveTag>(sortKey, entity, false);
-                Ecb.SetComponentEnabled<InDeadTag>(sortKey, entity, false);
+                Ecb.SetComponentEnabled<InDeadState>(sortKey, entity, false);
 
                 Ecb.AppendToBuffer(sortKey, entity, new CreatureDataProcess
                 {

@@ -14,7 +14,10 @@ namespace DotsSystem
     {
         [ReadOnly] private ComponentLookup<LocalToWorld> _localToWorldLookup;
         [ReadOnly] private ComponentLookup<PlayerAttrData> _attrLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusSummon> _summonLookup;
+        [ReadOnly] private ComponentLookup<StatusHp> _hpLookup;
+        [ReadOnly] private ComponentLookup<StatusCenter> _centerLookup;
+        
         [ReadOnly] private BufferLookup<PlayerAttrModify> _attrModifyLookup;
         [ReadOnly] private BufferLookup<BuffEntities> _buffEntitiesLookup;
         [ReadOnly] private ComponentLookup<BuffTag> _buffTagLookup;
@@ -26,7 +29,9 @@ namespace DotsSystem
             state.RequireForUpdate<GlobalInitialized>();
             _localToWorldLookup = state.GetComponentLookup<LocalToWorld>(true);
             _attrLookup = state.GetComponentLookup<PlayerAttrData>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _summonLookup = state.GetComponentLookup<StatusSummon>(true);
+            _hpLookup = state.GetComponentLookup<StatusHp>(true);
+            _centerLookup = state.GetComponentLookup<StatusCenter>(true);
             _attrModifyLookup = state.GetBufferLookup<PlayerAttrModify>(true);
             _buffEntitiesLookup = state.GetBufferLookup<BuffEntities>(true);
             _buffTagLookup = state.GetComponentLookup<BuffTag>(true);
@@ -51,7 +56,9 @@ namespace DotsSystem
             _localToWorldLookup.Update(ref state);
             _attrLookup.Update(ref state);
             _attrModifyLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _hpLookup.Update(ref state);
+            _centerLookup.Update(ref state);
+            _summonLookup.Update(ref state);
             _buffEntitiesLookup.Update(ref state);
             _buffTagLookup.Update(ref state);
             _buffCommonLookup.Update(ref state);
@@ -66,7 +73,9 @@ namespace DotsSystem
                 LocalToWorldLookup = _localToWorldLookup,
                 AttrLookup = _attrLookup,
                 AttrModifyLookup = _attrModifyLookup,
-                CreatureLookup = _creatureLookup,
+                SummonLookup = _summonLookup,
+                HpLookup = _hpLookup,
+                CenterLookup = _centerLookup,
                 BuffEntitiesLookup = _buffEntitiesLookup,
                 BuffTagLookup = _buffTagLookup,
                 BuffCommonLookup = _buffCommonLookup,
@@ -87,7 +96,9 @@ namespace DotsSystem
             [ReadOnly] public ComponentLookup<LocalToWorld> LocalToWorldLookup;
             [ReadOnly] public ComponentLookup<PlayerAttrData> AttrLookup;
             [ReadOnly] public BufferLookup<PlayerAttrModify> AttrModifyLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<StatusSummon> SummonLookup;
+            [ReadOnly] public ComponentLookup<StatusHp> HpLookup;
+            [ReadOnly] public ComponentLookup<StatusCenter> CenterLookup;
             [ReadOnly] public BufferLookup<BuffEntities> BuffEntitiesLookup;
             [ReadOnly] public ComponentLookup<BuffTag> BuffTagLookup;
             [ReadOnly] public ComponentLookup<BuffCommonData> BuffCommonLookup;
@@ -95,19 +106,26 @@ namespace DotsSystem
             [BurstCompile]
             private void Execute(ProgressBarComponent tag, LocalTransform localTransform, Entity entity, [EntityIndexInQuery] int sortKey)
             {
-                if (LocalToWorldLookup.HasComponent(tag.Value) && CreatureLookup.TryGetComponent(entity, out var creature))
+                if (LocalToWorldLookup.HasComponent(tag.Value) 
+                    && HpLookup.TryGetComponent(entity, out var creature))
                 {
                     //同步血量
-                    var hp = creature.CurHp / AttrHelper.GetMaxHp(entity, AttrLookup, AttrModifyLookup, CreatureLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
+                    var hp = creature.CurHp / AttrHelper.GetMaxHp(entity, AttrLookup, AttrModifyLookup, HpLookup, SummonLookup, BuffEntitiesLookup, BuffTagLookup, BuffCommonLookup);
                     Ecb.SetComponent(sortKey, tag.Value, new MaterialFillRate
                     {
                         Value = hp - 0.5f,
                     });
 
                     //同步位置
+                    var pos = localTransform.Position;
+                    if (CenterLookup.TryGetComponent(entity, out var center))
+                    {
+                        pos = CreatureHelper.GetHeadPos(localTransform.Position, center, localTransform.Scale);
+                    }
+                    
                     Ecb.SetComponent(sortKey, tag.Value, new LocalTransform
                     {
-                        Position = CreatureHelper.getHeadPos( localTransform.Position, creature, localTransform.Scale),
+                        Position = pos,
                         Rotation = quaternion.identity,
                         Scale = localTransform.Scale,
                     });

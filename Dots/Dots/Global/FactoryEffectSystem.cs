@@ -1,7 +1,3 @@
-using Dots;
-using Dots;
-using Dots;
-using Dots;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -15,9 +11,9 @@ namespace Dots
     public partial struct FactoryEffectSystem : ISystem
     {
         [ReadOnly] private ComponentLookup<CreatureTag> _creatureTag;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<StatusCenter> _centerLookup;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -27,9 +23,9 @@ namespace Dots
             state.RequireForUpdate<LocalPlayerTag>();
 
             _creatureTag = state.GetComponentLookup<CreatureTag>(true);
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _centerLookup = state.GetComponentLookup<StatusCenter>(true);
         }
 
         [BurstCompile]
@@ -43,7 +39,7 @@ namespace Dots
             _creatureTag.Update(ref state);
             _deadLookup.Update(ref state);
             _transformLookup.Update(ref state);
-            _creatureLookup.Update(ref state);
+            _centerLookup.Update(ref state);
 
             var ecb = new EntityCommandBuffer(Allocator.Temp);
             var global = SystemAPI.GetAspect<GlobalAspect>(SystemAPI.GetSingletonEntity<GlobalInitialized>());
@@ -85,7 +81,7 @@ namespace Dots
                     }
                 }
                 
-                FactoryHelper.CreateEffects(global, cache, buffer, ecb, _transformLookup, _creatureLookup);
+                FactoryHelper.CreateEffects(global, cache, buffer, ecb, _transformLookup, _centerLookup);
                
             }
 

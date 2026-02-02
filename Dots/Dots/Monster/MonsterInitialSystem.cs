@@ -12,8 +12,7 @@ namespace Dots
     [UpdateInGroup(typeof(CreatureSystemGroup))]
     public partial struct MonsterInitialSystem : ISystem
     {
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
-        [ReadOnly] private ComponentLookup<CreatureForward> _forwardLookup;
+        [ReadOnly] private ComponentLookup<StatusForward> _forwardLookup;
         [ReadOnly] private ComponentLookup<HybridEvent_SetActive> _eventSetActive;
         [ReadOnly] private ComponentLookup<LocalTransform> _transformLookup;
         [ReadOnly] private BufferLookup<BindingBullet> _bindBulletLookup;
@@ -25,9 +24,8 @@ namespace Dots
             state.RequireForUpdate<LocalPlayerTag>();
             state.RequireForUpdate<CacheProperties>();
 
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
-            _forwardLookup = state.GetComponentLookup<CreatureForward>(true);
-            _forwardLookup = state.GetComponentLookup<CreatureForward>(true);
+            _forwardLookup = state.GetComponentLookup<StatusForward>(true);
+            _forwardLookup = state.GetComponentLookup<StatusForward>(true);
             _eventSetActive = state.GetComponentLookup<HybridEvent_SetActive>(true);
             _bindBulletLookup = state.GetBufferLookup<BindingBullet>(true);
             _transformLookup = state.GetComponentLookup<LocalTransform>(true);
@@ -39,7 +37,6 @@ namespace Dots
 
         public void OnUpdate(ref SystemState state)
         {
-            _creatureLookup.Update(ref state);
             _forwardLookup.Update(ref state);
             _eventSetActive.Update(ref state);
             _bindBulletLookup.Update(ref state);
@@ -51,7 +48,8 @@ namespace Dots
 
             //初始化
             var ecb = new EntityCommandBuffer(Allocator.Temp);
-            foreach (var (tag, monsterProperties, creature, transform, entity) in SystemAPI.Query<MonsterInitTag, RefRW<MonsterProperties>, RefRW<CreatureProperties>, LocalTransform>().WithEntityAccess())
+            foreach (var (tag, monsterProperties, creature, props, transform, entity) 
+                     in SystemAPI.Query<MonsterInitTag, RefRW<MonsterProperties>, RefRW<CreatureTag>, CreatureProps, LocalTransform>().WithEntityAccess())
             {
                 ecb.RemoveComponent<MonsterInitTag>(entity);
 
@@ -118,11 +116,11 @@ namespace Dots
 
                 //怪物出生技能, 来自配置表技能
                 var position = transform.Position;
-                SkillHelper.AddSkill(global.Entity, entity, config.Skill1, creature.ValueRO.AtkValue, position, ecb);
-                SkillHelper.AddSkill(global.Entity, entity, config.Skill2, creature.ValueRO.AtkValue, position, ecb);
-                SkillHelper.AddSkill(global.Entity, entity, config.Skill3, creature.ValueRO.AtkValue, position, ecb);
-                SkillHelper.AddSkill(global.Entity, entity, config.Skill4, creature.ValueRO.AtkValue, position, ecb);
-                SkillHelper.AddSkill(global.Entity, entity, config.Skill5, creature.ValueRO.AtkValue, position, ecb);
+                SkillHelper.AddSkill(global.Entity, entity, config.Skill1, props.AtkValue, position, ecb);
+                SkillHelper.AddSkill(global.Entity, entity, config.Skill2, props.AtkValue, position, ecb);
+                SkillHelper.AddSkill(global.Entity, entity, config.Skill3, props.AtkValue, position, ecb);
+                SkillHelper.AddSkill(global.Entity, entity, config.Skill4, props.AtkValue, position, ecb);
+                SkillHelper.AddSkill(global.Entity, entity, config.Skill5, props.AtkValue, position, ecb);
 
                 //来自外部养成系统技能
                 switch (creature.ValueRO.Type)
@@ -132,7 +130,7 @@ namespace Dots
                         for (var i = 0; i < FightData.SmallSkills.Count; i++)
                         {
                             var skillId = FightData.SmallSkills[i];
-                            SkillHelper.AddSkill(global.Entity, entity, skillId, creature.ValueRO.AtkValue, position, ecb);
+                            SkillHelper.AddSkill(global.Entity, entity, skillId, props.AtkValue, position, ecb);
                         }
 
                         break;
@@ -142,7 +140,7 @@ namespace Dots
                         for (var i = 0; i < FightData.EliteSkills.Count; i++)
                         {
                             var skillId = FightData.EliteSkills[i];
-                            SkillHelper.AddSkill(global.Entity, entity, skillId, creature.ValueRO.AtkValue, position, ecb);
+                            SkillHelper.AddSkill(global.Entity, entity, skillId, props.AtkValue, position, ecb);
                         }
 
                         break;
@@ -152,7 +150,7 @@ namespace Dots
                         for (var i = 0; i < FightData.BossSkills.Count; i++)
                         {
                             var skillId = FightData.BossSkills[i];
-                            SkillHelper.AddSkill(global.Entity, entity, skillId, creature.ValueRO.AtkValue, position, ecb);
+                            SkillHelper.AddSkill(global.Entity, entity, skillId, props.AtkValue, position, ecb);
                         }
 
                         break;
@@ -188,7 +186,7 @@ namespace Dots
                     //绑定子弹
                     if (config.BindBulletId > 0)
                     {
-                        BulletHelper.BindCollisionBullet(global, entity, creature.ValueRO, _bindBulletLookup, _transformLookup, config.BindBulletId);
+                        BulletHelper.BindCollisionBullet(global, entity, props, _bindBulletLookup, _transformLookup, config.BindBulletId);
                     }
                 }
             }

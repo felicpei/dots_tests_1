@@ -60,7 +60,7 @@ namespace Dots
                 }
 
                 //停止玩家动作
-                foreach (var creatureMove in SystemAPI.Query<RefRW<CreatureMove>>())
+                foreach (var creatureMove in SystemAPI.Query<RefRW<StatusMove>>())
                 {
                     creatureMove.ValueRW.InMove = false;
                 }

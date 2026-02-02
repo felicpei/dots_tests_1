@@ -6,14 +6,13 @@ using Unity.Transforms;
 
 namespace Dots
 {
-    public readonly partial struct PlayerAspect : IAspect
+    public readonly partial struct Player1Aspect : IAspect
     {
         public readonly Entity Entity;
         public readonly RefRW<RandomSeed> Random;
 
 
         public readonly RefRW<LocalPlayerTag> Properties;
-        public readonly RefRW<CreatureProperties> Creature;
         public readonly RefRW<LocalTransform> Transform;
         public readonly RefRW<PlayerAttrData> Attr;
         public readonly RefRO<ShieldProperties> Shield;

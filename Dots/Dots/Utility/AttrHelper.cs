@@ -1,5 +1,4 @@
-﻿using System;
-using Deploys;
+﻿using Deploys;
 using Unity.Entities;
 using UnityEngine;
 
@@ -52,12 +51,17 @@ namespace Dots
             return int.MaxValue;
         }
 
-        public static float GetAttr(Entity entity, EAttr attr, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> modifyLookup, ComponentLookup<CreatureProperties> creatureLookup,
-            BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
+        public static float GetAttr(Entity entity, EAttr attr, 
+            ComponentLookup<PlayerAttrData> attrLookup, 
+            BufferLookup<PlayerAttrModify> modifyLookup, 
+            ComponentLookup<StatusSummon> summonLookup,
+            BufferLookup<BuffEntities> buffEntitiesLookup, 
+            ComponentLookup<BuffTag> buffTagLookup,
+            ComponentLookup<BuffCommonData> buffCommonLookup)
         {
             //find master root
             //如果master root 是player, 属性才生效
-            var masterRoot = CreatureHelper.GetMasterRoot(entity, creatureLookup);
+            var masterRoot = CreatureHelper.GetMasterRoot(entity, summonLookup);
             if (attrLookup.TryGetComponent(masterRoot, out var attrData))
             {
                 var modifyFactor = 1f;
@@ -113,7 +117,7 @@ namespace Dots
                         return attrData.ShootCount * modifyFactor;
                     case EAttr.DamageRange:
                     {
-                        var buffAdd = BuffHelper.GetBuffAddFactor(entity, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.AtkRange);
+                        var buffAdd = BuffHelper.GetBuffAddFactor(entity, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup, EBuffType.AtkRange);
                         return attrData.DamageRange * modifyFactor + buffAdd;
                     }
                     case EAttr.ExpFactor:
@@ -141,13 +145,19 @@ namespace Dots
             return 0;
         }
 
-        public static float GetMaxHp(Entity entity, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> modifyLookup, ComponentLookup<CreatureProperties> creatureLookup,
-            BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup)
+        public static float GetMaxHp(Entity entity, 
+            ComponentLookup<PlayerAttrData> attrLookup, 
+            BufferLookup<PlayerAttrModify> modifyLookup, 
+            ComponentLookup<StatusHp> hpLookup,
+            ComponentLookup<StatusSummon> summonLookup,
+            BufferLookup<BuffEntities> buffEntitiesLookup, 
+            ComponentLookup<BuffTag> buffTagLookup, 
+            ComponentLookup<BuffCommonData> buffCommonLookup)
         {
-            if (creatureLookup.TryGetComponent(entity, out var creatureProperties))
+            if (hpLookup.TryGetComponent(entity, out var hpInfo))
             {
-                var factor = creatureProperties.FullHpFactor + GetAttr(entity, EAttr.MaxHp, attrLookup, modifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
-                var maxHp = creatureProperties.FullHp * (1 + factor);
+                var factor = hpInfo.FullHpFactor + GetAttr(entity, EAttr.MaxHp, attrLookup, modifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+                var maxHp = hpInfo.FullHp * (1 + factor);
                 if (maxHp < 1)
                 {
                     maxHp = 1f;
@@ -160,28 +170,30 @@ namespace Dots
             return 1;
         }
 
-        public static void AddAttr(PlayerAspect player, EAttr type, float addValue, EntityCommandBuffer ecb)
+        public static void AddAttr(Entity localPlayer, RefRW<PlayerAttrData> attr,
+            DynamicBuffer<ServantList> servants,
+            EAttr type, float addValue, EntityCommandBuffer ecb)
         {
             switch (type)
             {
                 case EAttr.MaxHp:
                 {
-                    player.Attr.ValueRW.MaxHp += addValue;
+                    attr.ValueRW.MaxHp += addValue;
 
                     if (addValue > 0)
                     {
                         //local player
                         {
-                            ecb.AppendToBuffer(player.Entity, new CreatureDataProcess
+                            ecb.AppendToBuffer(localPlayer, new CreatureDataProcess
                             {
                                 Type = ECreatureDataProcess.AddCurHp,
                                 AddValue = addValue,
                             });
-                            ecb.SetComponentEnabled<CreatureDataProcess>(player.Entity, true);
+                            ecb.SetComponentEnabled<CreatureDataProcess>(localPlayer, true);
                         }
 
                         //all servants
-                        foreach (var servant in player.Servants)
+                        foreach (var servant in servants)
                         {
                             ecb.AppendToBuffer(servant.Value, new CreatureDataProcess
                             {
@@ -195,79 +207,79 @@ namespace Dots
                     break;
                 }
                 case EAttr.Recovery:
-                    player.Attr.ValueRW.Recovery += addValue;
+                    attr.ValueRW.Recovery += addValue;
                     break;
                 case EAttr.MoveSpeed:
-                    player.Attr.ValueRW.MoveSpeed += addValue;
+                    attr.ValueRW.MoveSpeed += addValue;
                     break;
                 case EAttr.Armor:
-                    player.Attr.ValueRW.Armor += addValue;
+                    attr.ValueRW.Armor += addValue;
                     break;
                 case EAttr.Dodge:
-                    player.Attr.ValueRW.Dodge += addValue;
+                    attr.ValueRW.Dodge += addValue;
                     break;
                 case EAttr.Crit:
-                    player.Attr.ValueRW.Crit += addValue;
+                    attr.ValueRW.Crit += addValue;
                     break;
                 case EAttr.CritDamage:
-                    player.Attr.ValueRW.CritDamage += addValue;
+                    attr.ValueRW.CritDamage += addValue;
                     break;
                 case EAttr.Damage:
-                    player.Attr.ValueRW.Damage += addValue;
+                    attr.ValueRW.Damage += addValue;
                     break;
                 case EAttr.PhysicsAtk:
-                    player.Attr.ValueRW.PhysicsAtk += addValue;
+                    attr.ValueRW.PhysicsAtk += addValue;
                     break;
                 case EAttr.FireAtk:
-                    player.Attr.ValueRW.FireAtk += addValue;
+                    attr.ValueRW.FireAtk += addValue;
                     break;
                 case EAttr.WaterAtk:
-                    player.Attr.ValueRW.WaterAtk += addValue;
+                    attr.ValueRW.WaterAtk += addValue;
                     break;
                 case EAttr.IceAtk:
-                    player.Attr.ValueRW.IceAtk += addValue;
+                    attr.ValueRW.IceAtk += addValue;
                     break;
                 case EAttr.LightingAtk:
-                    player.Attr.ValueRW.LightingAtk += addValue;
+                    attr.ValueRW.LightingAtk += addValue;
                     break;
                 case EAttr.StoneAtk:
-                    player.Attr.ValueRW.StoneAtk += addValue;
+                    attr.ValueRW.StoneAtk += addValue;
                     break;
                 case EAttr.SkillSpeed:
-                    player.Attr.ValueRW.SkillSpeed += addValue;
+                    attr.ValueRW.SkillSpeed += addValue;
                     break;
                 case EAttr.BulletSpeed:
-                    player.Attr.ValueRW.BulletSpeed += addValue;
+                    attr.ValueRW.BulletSpeed += addValue;
                     break;
                 case EAttr.DamageInterval:
-                    player.Attr.ValueRW.DamageInterval += addValue;
+                    attr.ValueRW.DamageInterval += addValue;
                     break;
                 case EAttr.ShootCount:
-                    player.Attr.ValueRW.ShootCount += addValue;
+                    attr.ValueRW.ShootCount += addValue;
                     break;
                 case EAttr.DamageRange:
-                    player.Attr.ValueRW.DamageRange += addValue;
+                    attr.ValueRW.DamageRange += addValue;
                     break;
                 case EAttr.ExpFactor:
-                    player.Attr.ValueRW.ExpFactor += addValue;
+                    attr.ValueRW.ExpFactor += addValue;
                     break;
                 case EAttr.Lucky:
-                    player.Attr.ValueRW.Lucky += addValue;
+                    attr.ValueRW.Lucky += addValue;
                     break;
                 case EAttr.Interest:
-                    player.Attr.ValueRW.Interest += addValue;
+                    attr.ValueRW.Interest += addValue;
                     break;
                 case EAttr.BossDamage:
-                    player.Attr.ValueRW.BossDamage += addValue;
+                    attr.ValueRW.BossDamage += addValue;
                     break;
                 case EAttr.EnemySpeed:
-                    player.Attr.ValueRW.EnemySpeed += addValue;
+                    attr.ValueRW.EnemySpeed += addValue;
                     break;
                 case EAttr.EnemyCount:
-                    player.Attr.ValueRW.EnemyCount += addValue;
+                    attr.ValueRW.EnemyCount += addValue;
                     break;
                 case EAttr.PickupRange:
-                    player.Attr.ValueRW.PickupRange += addValue;
+                    attr.ValueRW.PickupRange += addValue;
                     break;
                 default:
                 {
@@ -306,10 +318,10 @@ namespace Dots
             return 0.01f;
         }
 
-        public static float GetDamageRangeFactor(Entity entity,ComponentLookup<CreatureProperties> creatureLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup, 
+        public static float GetDamageRangeFactor(Entity entity,ComponentLookup<StatusSummon> summonLookup, ComponentLookup<PlayerAttrData> attrLookup, BufferLookup<PlayerAttrModify> attrModifyLookup, 
             BufferLookup<BuffEntities> buffEntitiesLookup, ComponentLookup<BuffTag> buffTagLookup, ComponentLookup<BuffCommonData> buffCommonLookup, bool useMax)
         {
-            var value = GetAttr(entity, EAttr.DamageRange, attrLookup, attrModifyLookup, creatureLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
+            var value = GetAttr(entity, EAttr.DamageRange, attrLookup, attrModifyLookup, summonLookup, buffEntitiesLookup, buffTagLookup, buffCommonLookup);
             var minValue = GetMin(EAttr.DamageRange);
             if (value < minValue)
             {

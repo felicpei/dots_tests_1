@@ -15,7 +15,7 @@ namespace Dots
     public partial struct CreatureRepelPositionSystem : ISystem
     {
         private EntityQuery _query;
-        [ReadOnly] private ComponentLookup<InDeadTag> _deadLookup;
+        [ReadOnly] private ComponentLookup<InDeadState> _deadLookup;
         [ReadOnly] private ComponentLookup<InDashingTag> _dashLookup;
 
         [BurstCompile]
@@ -27,7 +27,7 @@ namespace Dots
             _query = state.GetEntityQuery(queryBuilder);
             queryBuilder.Dispose();
 
-            _deadLookup = state.GetComponentLookup<InDeadTag>(true);
+            _deadLookup = state.GetComponentLookup<InDeadState>(true);
             _dashLookup = state.GetComponentLookup<InDashingTag>(true);
         }
 
@@ -79,7 +79,7 @@ namespace Dots
             public float DeltaTime;
             public EntityCommandBuffer.ParallelWriter Ecb;
             [ReadOnly] public CollisionWorld World;
-            [ReadOnly] public ComponentLookup<InDeadTag> DeadLookup;
+            [ReadOnly] public ComponentLookup<InDeadState> DeadLookup;
             [ReadOnly] public ComponentLookup<InDashingTag> DashLookup;
 
             [BurstCompile]
@@ -89,7 +89,7 @@ namespace Dots
                 if (DeadLookup.HasComponent(entity) && DeadLookup.IsComponentEnabled(entity) ||
                     DashLookup.HasComponent(entity) && DashLookup.IsComponentEnabled(entity))
                 {
-                    Ecb.SetComponentEnabled<InRepelTag>(sortKey, entity, false);
+                    Ecb.SetComponentEnabled<InRepelState>(sortKey, entity, false);
                     Ecb.SetComponentEnabled<CreatureRepelPosition>(sortKey, entity, false);
                     return;
                 }
@@ -98,7 +98,7 @@ namespace Dots
                 if (tag.ValueRO.Timer <= 0)
                 {
                     //init
-                    Ecb.SetComponentEnabled<InRepelTag>(sortKey, entity, true);
+                    Ecb.SetComponentEnabled<InRepelState>(sortKey, entity, true);
 
                     //target pos 要判断下有没有障碍
                     if (PhysicsHelper.RayCast(World, PhysicsLayers.DontMove, localTransform.ValueRO.Position, tag.ValueRO.Forward, tag.ValueRO.Distance, out var hitInfo))
@@ -113,7 +113,7 @@ namespace Dots
                 else if (tag.ValueRO.Timer >= tag.ValueRO.ContTime)
                 {
                     Ecb.SetComponentEnabled<CreatureRepelPosition>(sortKey, entity, false);
-                    Ecb.SetComponentEnabled<InRepelTag>(sortKey, entity, false);
+                    Ecb.SetComponentEnabled<InRepelState>(sortKey, entity, false);
                     return;
                 }
 

@@ -14,7 +14,7 @@ namespace Dots
     public partial struct SkillCastSystem : ISystem
     {
         [ReadOnly] private ComponentLookup<CacheProperties> _cacheLookup;
-        [ReadOnly] private ComponentLookup<CreatureProperties> _creatureLookup;
+        [ReadOnly] private ComponentLookup<CreatureTag> _creatureLookup;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -23,7 +23,7 @@ namespace Dots
             state.RequireForUpdate<CacheProperties>();
             
             _cacheLookup  = state.GetComponentLookup<CacheProperties>(true);
-            _creatureLookup = state.GetComponentLookup<CreatureProperties>(true);
+            _creatureLookup = state.GetComponentLookup<CreatureTag>(true);
         }
 
         [BurstCompile]
@@ -71,7 +71,7 @@ namespace Dots
             public bool InMonsterPause;
             public EntityCommandBuffer.ParallelWriter Ecb;
             [ReadOnly] public ComponentLookup<CacheProperties> CacheLookup;
-            [ReadOnly] public ComponentLookup<CreatureProperties> CreatureLookup;
+            [ReadOnly] public ComponentLookup<CreatureTag> CreatureLookup;
             
             [BurstCompile]
             private void Execute(MasterCreature master, DynamicBuffer<SkillTargetBuffer> targetBuffers, RefRW<SkillProperties> properties, Entity entity, [EntityIndexInQuery] int sortKey)
@@ -85,7 +85,7 @@ namespace Dots
                     return;
                 }
 
-                if (InMonsterPause && masterCreature.AtkValue.Team == ETeamId.Monster)
+                if (InMonsterPause && masterCreature.TeamId == ETeamId.Monster)
                 {
                     return;
                 }
